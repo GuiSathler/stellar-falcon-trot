@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Folder, FileText, MoreVertical, Plus, ChevronRight, Search, Trash2 } from 'lucide-react';
 import { showSuccess } from '@/utils/toast';
+import { v4 as uuidv4 } from 'uuid';
 
 interface DashboardProps {
   onSelectMap: (id: string) => void;
@@ -20,7 +21,7 @@ const Dashboard = ({ onSelectMap }: DashboardProps) => {
 
   const createNewMap = () => {
     const newMap = {
-      id: Date.now().toString(),
+      id: uuidv4(),
       title: `Novo Mapa ${maps.length + 1}`,
       date: new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
     };

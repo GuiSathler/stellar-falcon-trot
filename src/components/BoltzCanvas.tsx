@@ -37,7 +37,9 @@ import {
   Redo2,
   Plus,
   Minus,
-  Target
+  Target,
+  Check,
+  X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -52,13 +54,15 @@ const BoltzCanvasInner = () => {
   const [isMiniMapOpen, setIsMiniMapOpen] = useState(true);
   const [connectingSourceId, setConnectingSourceId] = useState<string | null>(null);
   
+  // Estado para criação de novo nó pai
+  const [isCreatingRoot, setIsCreatingRoot] = useState(false);
+  const [newRootName, setNewRootName] = useState('');
+  
   // Estados para Histórico
   const [past, setPast] = useState<{ nodes: Node[], edges: any[] }[]>([]);
   const [future, setFuture] = useState<{ nodes: Node[], edges: any[] }[]>([]);
   
   const { fitView, zoomIn, zoomOut, getEdges, getNodes, setViewport, getViewport } = useReactFlow();
-  
-  // Obtém o zoom atual do store do React Flow
   const zoom = useStore((s) => s.transform[2]);
 
   const takeSnapshot = useCallback(() => {
@@ -176,11 +180,9 @@ const BoltzCanvasInner = () => {
     ]);
   }, [getEdges, setNodes, setEdges, onStartConnection, onNodeClick, takeSnapshot]);
 
-  const addRootNode = useCallback(() => {
-    const name = window.prompt("Digite o nome do novo nó pai:");
-    
-    if (!name || name.trim() === "") {
-      showError("O nome do nó é obrigatório para a criação.");
+  const confirmAddRootNode = () => {
+    if (!newRootName.trim()) {
+      showError("O nome do nó é obrigatório.");
       return;
     }
 
@@ -190,7 +192,7 @@ const BoltzCanvasInner = () => {
       id,
       type: 'mindmap',
       data: { 
-        label: name, 
+        label: newRootName, 
         nodeType: 'idea',
         onAddChild: () => addChildNode(id),
         onStartConnection,
@@ -200,10 +202,11 @@ const BoltzCanvasInner = () => {
       position: { x: 100, y: nodes.length * 150 + 100 },
     };
     setNodes((nds) => [...nds, newNode]);
+    setNewRootName('');
+    setIsCreatingRoot(false);
     showSuccess("Nó pai criado!");
-  }, [nodes.length, setNodes, addChildNode, onStartConnection, onNodeClick, takeSnapshot]);
+  };
 
-  // Inicialização com o nome padrão solicitado
   useEffect(() => {
     if (nodes.length === 0) {
       const id = uuidv4();
@@ -284,13 +287,40 @@ const BoltzCanvasInner = () => {
             </button>
 
             <div className={cn("flex flex-col gap-1.5", !isMenuOpen && "items-center")}>
-              <button 
-                onClick={addRootNode}
-                className="flex items-center gap-2.5 p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-md mb-2"
-              >
-                <PlusCircle size={18} />
-                {isMenuOpen && <span className="text-xs font-bold">Novo Pai</span>}
-              </button>
+              {isCreatingRoot && isMenuOpen ? (
+                <div className="flex flex-col gap-2 p-2 bg-blue-50 rounded-xl border border-blue-100 animate-in fade-in slide-in-from-top-2">
+                  <input 
+                    autoFocus
+                    placeholder="Nome do nó..."
+                    className="text-xs p-2 rounded-lg border border-blue-200 outline-none focus:ring-2 focus:ring-blue-200"
+                    value={newRootName}
+                    onChange={(e) => setNewRootName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && confirmAddRootNode()}
+                  />
+                  <div className="flex gap-1">
+                    <button 
+                      onClick={confirmAddRootNode}
+                      className="flex-1 bg-blue-600 text-white p-1.5 rounded-lg hover:bg-blue-700 transition-colors flex justify-center"
+                    >
+                      <Check size={14} />
+                    </button>
+                    <button 
+                      onClick={() => { setIsCreatingRoot(false); setNewRootName(''); }}
+                      className="flex-1 bg-white text-gray-400 p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors flex justify-center"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => setIsCreatingRoot(true)}
+                  className="flex items-center gap-2.5 p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-md mb-2"
+                >
+                  <PlusCircle size={18} />
+                  {isMenuOpen && <span className="text-xs font-bold">Novo Pai</span>}
+                </button>
+              )}
 
               <div className="h-px bg-gray-100 my-1" />
 
@@ -322,7 +352,6 @@ const BoltzCanvasInner = () => {
         {/* Barra de Ferramentas Unificada (Canto Inferior Esquerdo) */}
         <Panel position="bottom-left" className="m-6">
           <div className="flex items-center gap-3 bg-white border border-gray-100 rounded-2xl p-1.5 shadow-2xl">
-            {/* Grupo Histórico */}
             <div className="flex items-center border-r border-gray-100 pr-1.5">
               <button 
                 onClick={undo} 
@@ -348,7 +377,6 @@ const BoltzCanvasInner = () => {
               </button>
             </div>
 
-            {/* Grupo Zoom */}
             <div className="flex items-center gap-1">
               <button 
                 onClick={() => zoomOut()} 
@@ -378,7 +406,6 @@ const BoltzCanvasInner = () => {
               </button>
             </div>
 
-            {/* Botão Centralizar */}
             <div className="pl-1.5 border-l border-gray-100">
               <button 
                 onClick={() => fitView({ duration: 800 })} 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -18,14 +18,13 @@ import {
   OnEdgesChange,
   applyNodeChanges,
   applyEdgeChanges,
+  useStore,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import MindMapNode from './MindMapNode';
 import { v4 as uuidv4 } from 'uuid';
-import { showSuccess } from '@/utils/toast';
+import { showSuccess, showError } from '@/utils/toast';
 import { 
-  Maximize, 
-  Minimize2, 
   Layout, 
   PlusCircle, 
   Settings2, 
@@ -33,10 +32,12 @@ import {
   ChevronRight, 
   ChevronLeft,
   Download,
-  MousePointer2,
   Map as MapIcon,
   Undo2,
-  Redo2
+  Redo2,
+  Plus,
+  Minus,
+  Target
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -55,20 +56,20 @@ const BoltzCanvasInner = () => {
   const [past, setPast] = useState<{ nodes: Node[], edges: any[] }[]>([]);
   const [future, setFuture] = useState<{ nodes: Node[], edges: any[] }[]>([]);
   
-  const { fitView, zoomIn, zoomOut, getEdges, getNodes } = useReactFlow();
+  const { fitView, zoomIn, zoomOut, getEdges, getNodes, setViewport, getViewport } = useReactFlow();
+  
+  // Obtém o zoom atual do store do React Flow
+  const zoom = useStore((s) => s.transform[2]);
 
-  // Função para salvar o estado atual no histórico antes de uma mudança
   const takeSnapshot = useCallback(() => {
-    setPast((prev) => [...prev, { nodes: getNodes(), edges: getEdges() }].slice(-50)); // Limite de 50 passos
-    setFuture([]); // Limpa o futuro ao realizar nova ação
+    setPast((prev) => [...prev, { nodes: getNodes(), edges: getEdges() }].slice(-50));
+    setFuture([]);
   }, [getNodes, getEdges]);
 
   const undo = useCallback(() => {
     if (past.length === 0) return;
-    
     const previous = past[past.length - 1];
     const newPast = past.slice(0, past.length - 1);
-    
     setFuture((prev) => [{ nodes: getNodes(), edges: getEdges() }, ...prev]);
     setNodes(previous.nodes);
     setEdges(previous.edges);
@@ -77,34 +78,21 @@ const BoltzCanvasInner = () => {
 
   const redo = useCallback(() => {
     if (future.length === 0) return;
-    
     const next = future[0];
     const newFuture = future.slice(1);
-    
     setPast((prev) => [...prev, { nodes: getNodes(), edges: getEdges() }]);
     setNodes(next.nodes);
     setEdges(next.edges);
     setFuture(newFuture);
   }, [future, getNodes, getEdges, setNodes, setEdges]);
 
-  // Wrappers para mudanças que devem ser registradas no histórico
   const onNodesChange: OnNodesChange = useCallback(
-    (changes) => {
-      // Apenas salva no histórico se for uma mudança definitiva (como deletar ou terminar de arrastar)
-      const isSignificant = changes.some(c => c.type === 'remove' || c.type === 'position');
-      if (isSignificant) {
-        // Para posição, idealmente salvaríamos apenas no 'onNodeDragStop', 
-        // mas para simplificar e garantir o 'remove', salvamos aqui.
-      }
-      setNodes((nds) => applyNodeChanges(changes, nds));
-    },
+    (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
     [setNodes]
   );
 
   const onEdgesChange: OnEdgesChange = useCallback(
-    (changes) => {
-      setEdges((eds) => applyEdgeChanges(changes, eds));
-    },
+    (changes) => setEdges((eds) => applyEdgeChanges(changes, eds)),
     [setEdges]
   );
 
@@ -189,13 +177,20 @@ const BoltzCanvasInner = () => {
   }, [getEdges, setNodes, setEdges, onStartConnection, onNodeClick, takeSnapshot]);
 
   const addRootNode = useCallback(() => {
+    const name = window.prompt("Digite o nome do novo nó pai:");
+    
+    if (!name || name.trim() === "") {
+      showError("O nome do nó é obrigatório para a criação.");
+      return;
+    }
+
     takeSnapshot();
     const id = uuidv4();
     const newNode: Node = {
       id,
       type: 'mindmap',
       data: { 
-        label: 'Tópico Central', 
+        label: name, 
         nodeType: 'idea',
         onAddChild: () => addChildNode(id),
         onStartConnection,
@@ -205,7 +200,29 @@ const BoltzCanvasInner = () => {
       position: { x: 100, y: nodes.length * 150 + 100 },
     };
     setNodes((nds) => [...nds, newNode]);
+    showSuccess("Nó pai criado!");
   }, [nodes.length, setNodes, addChildNode, onStartConnection, onNodeClick, takeSnapshot]);
+
+  // Inicialização com o nome padrão solicitado
+  useEffect(() => {
+    if (nodes.length === 0) {
+      const id = uuidv4();
+      const initialNode: Node = {
+        id,
+        type: 'mindmap',
+        data: { 
+          label: 'Meu novo mapa mental', 
+          nodeType: 'idea',
+          onAddChild: () => addChildNode(id),
+          onStartConnection,
+          onNodeClick,
+          connectingSourceId: null
+        },
+        position: { x: 100, y: 100 },
+      };
+      setNodes([initialNode]);
+    }
+  }, []);
 
   useEffect(() => {
     setNodes((nds) => nds.map(n => ({
@@ -213,10 +230,6 @@ const BoltzCanvasInner = () => {
       data: { ...n.data, connectingSourceId }
     })));
   }, [connectingSourceId, setNodes]);
-
-  useEffect(() => {
-    if (nodes.length === 0) addRootNode();
-  }, []);
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -231,6 +244,17 @@ const BoltzCanvasInner = () => {
     [setEdges, takeSnapshot],
   );
 
+  const handleManualZoom = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const value = parseInt(e.currentTarget.value);
+      if (!isNaN(value)) {
+        const newZoom = Math.min(Math.max(value / 100, 0.1), 4);
+        const { x, y } = getViewport();
+        setViewport({ x, y, zoom: newZoom }, { duration: 300 });
+      }
+    }
+  };
+
   return (
     <div className={cn("w-full h-full bg-[#fcfcfc] relative overflow-hidden", connectingSourceId && "cursor-crosshair")}>
       <ReactFlow
@@ -239,7 +263,7 @@ const BoltzCanvasInner = () => {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        onNodeDragStart={takeSnapshot} // Salva antes de começar a arrastar
+        onNodeDragStart={takeSnapshot}
         nodeTypes={nodeTypes}
         fitView
         className="bg-transparent"
@@ -295,39 +319,75 @@ const BoltzCanvasInner = () => {
           </div>
         </Panel>
 
-        {/* Controles de Navegação e Histórico (Canto Inferior Esquerdo) */}
-        <Panel position="bottom-left" className="m-6 flex flex-col gap-3">
-          {/* Histórico Minimalista */}
-          <div className="flex bg-white border border-gray-100 rounded-xl p-1 shadow-lg">
-            <button 
-              onClick={undo} 
-              disabled={past.length === 0}
-              className={cn(
-                "p-2 rounded-lg transition-colors",
-                past.length === 0 ? "text-gray-200 cursor-not-allowed" : "text-gray-500 hover:bg-gray-50 hover:text-blue-600"
-              )}
-              title="Desfazer (Ctrl+Z)"
-            >
-              <Undo2 size={16} />
-            </button>
-            <button 
-              onClick={redo} 
-              disabled={future.length === 0}
-              className={cn(
-                "p-2 rounded-lg transition-colors",
-                future.length === 0 ? "text-gray-200 cursor-not-allowed" : "text-gray-500 hover:bg-gray-50 hover:text-blue-600"
-              )}
-              title="Refazer (Ctrl+Y)"
-            >
-              <Redo2 size={16} />
-            </button>
-          </div>
+        {/* Barra de Ferramentas Unificada (Canto Inferior Esquerdo) */}
+        <Panel position="bottom-left" className="m-6">
+          <div className="flex items-center gap-3 bg-white border border-gray-100 rounded-2xl p-1.5 shadow-2xl">
+            {/* Grupo Histórico */}
+            <div className="flex items-center border-r border-gray-100 pr-1.5">
+              <button 
+                onClick={undo} 
+                disabled={past.length === 0}
+                className={cn(
+                  "p-2 rounded-xl transition-all",
+                  past.length === 0 ? "text-gray-200" : "text-gray-500 hover:bg-gray-50 hover:text-blue-600"
+                )}
+                title="Desfazer"
+              >
+                <Undo2 size={18} />
+              </button>
+              <button 
+                onClick={redo} 
+                disabled={future.length === 0}
+                className={cn(
+                  "p-2 rounded-xl transition-all",
+                  future.length === 0 ? "text-gray-200" : "text-gray-500 hover:bg-gray-50 hover:text-blue-600"
+                )}
+                title="Refazer"
+              >
+                <Redo2 size={18} />
+              </button>
+            </div>
 
-          {/* Zoom e Foco */}
-          <div className="flex bg-white border border-gray-100 rounded-xl p-1 shadow-lg">
-            <button onClick={() => zoomIn()} className="p-2 hover:bg-gray-50 rounded-lg text-gray-400"><Maximize size={16} /></button>
-            <button onClick={() => zoomOut()} className="p-2 hover:bg-gray-50 rounded-lg text-gray-400"><Minimize2 size={16} /></button>
-            <button onClick={() => fitView()} className="p-2 hover:bg-gray-50 rounded-lg text-gray-400"><MousePointer2 size={16} /></button>
+            {/* Grupo Zoom */}
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={() => zoomOut()} 
+                className="p-2 text-gray-500 hover:bg-gray-50 hover:text-blue-600 rounded-xl transition-all"
+                title="Diminuir Zoom"
+              >
+                <Minus size={18} />
+              </button>
+              
+              <div className="flex items-center bg-gray-50 rounded-lg px-2 py-1 border border-gray-100 focus-within:border-blue-200 focus-within:ring-2 focus-within:ring-blue-50 transition-all">
+                <input 
+                  type="text"
+                  defaultValue={Math.round(zoom * 100)}
+                  key={Math.round(zoom * 100)}
+                  onKeyDown={handleManualZoom}
+                  className="w-8 bg-transparent text-[11px] font-bold text-gray-700 text-center outline-none"
+                />
+                <span className="text-[10px] font-bold text-gray-400">%</span>
+              </div>
+
+              <button 
+                onClick={() => zoomIn()} 
+                className="p-2 text-gray-500 hover:bg-gray-50 hover:text-blue-600 rounded-xl transition-all"
+                title="Aumentar Zoom"
+              >
+                <Plus size={18} />
+              </button>
+            </div>
+
+            {/* Botão Centralizar */}
+            <div className="pl-1.5 border-l border-gray-100">
+              <button 
+                onClick={() => fitView({ duration: 800 })} 
+                className="p-2 text-gray-500 hover:bg-gray-50 hover:text-blue-600 rounded-xl transition-all"
+                title="Centralizar Mapa"
+              >
+                <Target size={18} />
+              </button>
+            </div>
           </div>
         </Panel>
 

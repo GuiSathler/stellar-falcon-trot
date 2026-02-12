@@ -30,7 +30,8 @@ const Auth = () => {
         showSuccess("Conta criada! Verifique seu e-mail.");
       }
     } catch (error: any) {
-      showError(error.message || "Ocorreu um erro na autenticação.");
+      // Use a generic error message to prevent account enumeration
+      showError("E-mail ou senha inválidos. Por favor, verifique seus dados e tente novamente.");
     } finally {
       setIsLoading(false);
     }

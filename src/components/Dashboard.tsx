@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Folder, FileText, MoreVertical, Plus, ChevronRight, Search, Trash2 } from 'lucide-react';
 import { showSuccess } from '@/utils/toast';
 import { v4 as uuidv4 } from 'uuid';
+import { supabase } from '@/lib/supabase';
 
 interface DashboardProps {
   onSelectMap: (id: string) => void;
@@ -11,19 +12,31 @@ interface DashboardProps {
 
 const Dashboard = ({ onSelectMap }: DashboardProps) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [userId, setUserId] = useState<string | null>(null);
   const [maps, setMaps] = useState([
     { id: uuidv4(), title: 'Estratégia de Produto', date: '24 Mai 2024' },
     { id: uuidv4(), title: 'Arquitetura Boltz', date: '22 Mai 2024' },
     { id: uuidv4(), title: 'User Journey', date: '20 Mai 2024' },
   ]);
 
+  // Fetch user ID to prepare for RLS-compliant queries
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setUserId(user.id);
+    };
+    getUser();
+  }, []);
+
   const filteredMaps = maps.filter(m => m.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const createNewMap = () => {
+    // NOTE: When persisting to DB, ensure user_id is included for RLS compliance
     const newMap = {
       id: uuidv4(),
       title: `Novo Mapa ${maps.length + 1}`,
-      date: new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+      date: new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }),
+      user_id: userId // Prepared for future persistence
     };
     setMaps([newMap, ...maps]);
     showSuccess("Novo mapa criado!");
@@ -31,6 +44,8 @@ const Dashboard = ({ onSelectMap }: DashboardProps) => {
 
   const deleteMap = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    // NOTE: When persisting to DB, RLS will prevent unauthorized deletions,
+    // but we should still verify ownership in the query: .eq('id', id).eq('user_id', userId)
     setMaps(maps.filter(m => m.id !== id));
     showSuccess("Mapa removido.");
   };

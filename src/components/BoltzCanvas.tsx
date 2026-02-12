@@ -190,8 +190,14 @@ const BoltzCanvasInner = () => {
 
     takeSnapshot();
 
-    // Algoritmo simples de organização em árvore
+    // Algoritmo de organização em árvore com proteção contra referências circulares
+    const visited = new Set<string>();
+    
     const organizeLevel = (parentId: string | null, startX: number, startY: number) => {
+      // Proteção contra ciclos: se já visitamos este nó nesta ramificação, paramos
+      if (parentId && visited.has(parentId)) return;
+      if (parentId) visited.add(parentId);
+
       const children = currentEdges
         .filter(e => e.source === parentId)
         .map(e => nodesToOrganize.find(n => n.id === e.target))
@@ -211,6 +217,10 @@ const BoltzCanvasInner = () => {
         organizeLevel(child.id, startX + 300, currentY);
         currentY += 120;
       });
+      
+      // Removemos do set após processar os filhos para permitir que o nó seja 
+      // alcançado por outros caminhos se necessário, mas não em ciclos infinitos
+      if (parentId) visited.delete(parentId);
     };
 
     // Encontra as raízes (nós sem pais dentro do conjunto a organizar)
@@ -218,7 +228,7 @@ const BoltzCanvasInner = () => {
       !currentEdges.some(e => e.target === node.id && nodesToOrganize.some(n => n.id === e.source))
     );
 
-    roots.forEach((root, index) => {
+    roots.forEach((root) => {
       const rootX = root.position.x;
       const rootY = root.position.y;
       organizeLevel(root.id, rootX, rootY);

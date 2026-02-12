@@ -13,3 +13,17 @@ export const supabase = createClient(
   supabaseUrl || placeholderUrl,
   supabaseAnonKey || placeholderKey
 );
+
+/**
+ * SECURITY GUIDELINES FOR DATABASE PERSISTENCE:
+ * 
+ * 1. Row Level Security (RLS):
+ *    Always enable RLS on all tables in the Supabase dashboard.
+ *    Create policies that restrict access based on auth.uid().
+ *    Example: CREATE POLICY "Users can only see their own maps" ON maps 
+ *    FOR ALL USING (auth.uid() = user_id);
+ * 
+ * 2. Client-Side Verification:
+ *    Always include the user's ID in queries as a secondary check.
+ *    Example: supabase.from('maps').select('*').eq('user_id', currentUser.id);
+ */

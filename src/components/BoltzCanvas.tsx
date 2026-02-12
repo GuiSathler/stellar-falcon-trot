@@ -44,7 +44,7 @@ const BoltzCanvasInner = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [isMenuOpen, setIsMenuOpen] = useState(true);
   const [isMiniMapOpen, setIsMiniMapOpen] = useState(true);
-  const { fitView, zoomIn, zoomOut, getNodes } = useReactFlow();
+  const { fitView, zoomIn, zoomOut, getEdges } = useReactFlow();
 
   const addChildNode = useCallback((parentId: string) => {
     const newNodeId = uuidv4();
@@ -53,19 +53,21 @@ const BoltzCanvasInner = () => {
       const parentNode = nds.find((n) => n.id === parentId);
       if (!parentNode) return nds;
 
-      // Lógica Anti-Sobreposição: Calcula posição baseada nos filhos existentes
-      const children = nds.filter(n => edges.some(e => e.source === parentId && e.target === n.id));
-      const verticalGap = 100;
-      const xOffset = 280;
+      // Obtém as conexões atuais para contar os filhos reais deste pai
+      const currentEdges = getEdges();
+      const childrenIds = currentEdges
+        .filter(e => e.source === parentId)
+        .map(e => e.target);
       
-      // Encontra a maior e menor posição Y dos filhos para evitar overlap
-      let nextY = parentNode.position.y;
-      if (children.length > 0) {
-        const maxY = Math.max(...children.map(c => c.position.y));
-        nextY = maxY + verticalGap;
-      } else {
-        nextY = parentNode.position.y;
-      }
+      const childrenCount = childrenIds.length;
+      const verticalGap = 120;
+      const xOffset = 300;
+      
+      // Algoritmo de Distribuição em Leque:
+      // Distribui os nós verticalmente: 0, +120, -120, +240, -240...
+      const multiplier = Math.ceil(childrenCount / 2);
+      const direction = childrenCount % 2 === 0 ? 1 : -1;
+      const yOffset = childrenCount === 0 ? 0 : direction * (multiplier * verticalGap);
       
       const newNode: Node = {
         id: newNodeId,
@@ -75,7 +77,10 @@ const BoltzCanvasInner = () => {
           nodeType: 'idea',
           onAddChild: () => addChildNode(newNodeId) 
         },
-        position: { x: parentNode.position.x + xOffset, y: nextY },
+        position: { 
+          x: parentNode.position.x + xOffset, 
+          y: parentNode.position.y + yOffset 
+        },
       };
 
       return [...nds, newNode];
@@ -92,7 +97,7 @@ const BoltzCanvasInner = () => {
         markerEnd: { type: MarkerType.ArrowClosed, color: '#cbd5e1' },
       }
     ]);
-  }, [edges, setNodes, setEdges]);
+  }, [getEdges, setNodes, setEdges]);
 
   const addRootNode = useCallback(() => {
     const id = uuidv4();
@@ -140,11 +145,11 @@ const BoltzCanvasInner = () => {
       >
         <Background color="#f1f1f1" gap={40} size={1} />
         
-        {/* Sidebar Direita Compacta */}
+        {/* Sidebar Direita Compacta e Organizada */}
         <Panel position="top-right" className="h-[calc(100%-2rem)] flex items-center pointer-events-none">
           <div className={cn(
             "bg-white border border-gray-100 shadow-2xl rounded-2xl transition-all duration-300 pointer-events-auto flex flex-col overflow-hidden",
-            isMenuOpen ? "w-56 p-3" : "w-12 p-2"
+            isMenuOpen ? "w-52 p-3" : "w-12 p-2"
           )}>
             <button 
               onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -153,10 +158,10 @@ const BoltzCanvasInner = () => {
               {isMenuOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
             </button>
 
-            <div className={cn("flex flex-col gap-2", !isMenuOpen && "items-center")}>
+            <div className={cn("flex flex-col gap-1.5", !isMenuOpen && "items-center")}>
               <button 
                 onClick={addRootNode}
-                className="flex items-center gap-2 p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-md"
+                className="flex items-center gap-2.5 p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-md mb-2"
               >
                 <PlusCircle size={18} />
                 {isMenuOpen && <span className="text-xs font-bold">Novo Pai</span>}
@@ -164,28 +169,28 @@ const BoltzCanvasInner = () => {
 
               <div className="h-px bg-gray-100 my-1" />
 
-              <button className="flex items-center gap-2 p-2 text-gray-500 hover:bg-gray-50 rounded-xl transition-all">
-                <Link2 size={18} className="text-blue-500" />
-                {isMenuOpen && <span className="text-xs font-medium">Conexão Manual</span>}
+              <button className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl transition-all group">
+                <Link2 size={18} className="text-blue-500 group-hover:scale-110 transition-transform" />
+                {isMenuOpen && <span className="text-xs font-medium">Conectar Nós</span>}
               </button>
 
-              <button className="flex items-center gap-2 p-2 text-gray-500 hover:bg-gray-50 rounded-xl transition-all">
-                <Sparkles size={18} className="text-amber-400" />
-                {isMenuOpen && <span className="text-xs font-medium">Sugerir com IA</span>}
+              <button className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl transition-all group">
+                <Sparkles size={18} className="text-amber-400 group-hover:scale-110 transition-transform" />
+                {isMenuOpen && <span className="text-xs font-medium">Sugerir IA</span>}
               </button>
 
-              <button className="flex items-center gap-2 p-2 text-gray-500 hover:bg-gray-50 rounded-xl transition-all">
-                <Layout size={18} />
-                {isMenuOpen && <span className="text-xs font-medium">Auto-organizar</span>}
+              <button className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl transition-all group">
+                <Layout size={18} className="text-indigo-400" />
+                {isMenuOpen && <span className="text-xs font-medium">Organizar</span>}
               </button>
 
-              <button className="flex items-center gap-2 p-2 text-gray-500 hover:bg-gray-50 rounded-xl transition-all">
-                <Settings2 size={18} />
-                {isMenuOpen && <span className="text-xs font-medium">Temas</span>}
+              <button className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl transition-all group">
+                <Settings2 size={18} className="text-gray-400" />
+                {isMenuOpen && <span className="text-xs font-medium">Ajustes</span>}
               </button>
 
-              <div className="mt-auto">
-                <button className="w-full flex items-center gap-2 p-2 text-gray-500 hover:bg-gray-50 rounded-xl transition-all">
+              <div className="mt-auto pt-4">
+                <button className="w-full flex items-center gap-2.5 p-2 text-gray-500 hover:bg-gray-50 rounded-xl transition-all">
                   <Download size={18} />
                   {isMenuOpen && <span className="text-xs font-medium">Exportar</span>}
                 </button>
@@ -207,19 +212,22 @@ const BoltzCanvasInner = () => {
         <Panel position="bottom-right" className="m-6 flex flex-col items-end gap-2">
           <button 
             onClick={() => setIsMiniMapOpen(!isMiniMapOpen)}
-            className="p-2 bg-white border border-gray-100 rounded-xl shadow-lg text-gray-500 hover:text-blue-600 transition-colors"
-            title="Alternar MiniMap"
+            className={cn(
+              "p-2 bg-white border border-gray-100 rounded-xl shadow-lg transition-all",
+              isMiniMapOpen ? "text-blue-600" : "text-gray-400 hover:text-blue-600"
+            )}
+            title={isMiniMapOpen ? "Recolher Mapa" : "Expandir Mapa"}
           >
             <MapIcon size={18} />
           </button>
           
           {isMiniMapOpen && (
-            <div className="bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
               <MiniMap 
-                style={{ width: 150, height: 100, margin: 0 }}
+                style={{ width: 140, height: 90, margin: 0 }}
                 nodeStrokeColor="#e2e8f0"
                 nodeColor="#ffffff"
-                maskColor="rgba(255, 255, 255, 0.2)"
+                maskColor="rgba(255, 255, 255, 0.3)"
               />
             </div>
           )}

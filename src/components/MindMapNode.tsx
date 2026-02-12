@@ -33,10 +33,12 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
 
   const handleBlur = () => {
     setIsEditing(false);
+    // Truncate label just in case, though maxLength should handle it
+    const sanitizedLabel = label.slice(0, 500);
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === id) {
-          return { ...node, data: { ...node.data, label } };
+          return { ...node, data: { ...node.data, label: sanitizedLabel } };
         }
         return node;
       })
@@ -76,6 +78,7 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
         {isEditing ? (
           <input
             autoFocus
+            maxLength={500}
             className="text-xs font-bold text-gray-800 outline-none w-full bg-transparent"
             value={label}
             onChange={(e) => setLabel(e.target.value)}

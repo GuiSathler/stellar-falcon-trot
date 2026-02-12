@@ -16,9 +16,16 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setIsAuthenticated(!!session);
-      setIsLoading(false);
+      try {
+        // getUser() is more secure than getSession() as it verifies the JWT with the server
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error) throw error;
+        setIsAuthenticated(!!user);
+      } catch (error) {
+        setIsAuthenticated(false);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     checkAuth();

@@ -19,6 +19,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
   useStore,
+  SelectionMode,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import MindMapNode from './MindMapNode';
@@ -54,15 +55,13 @@ const BoltzCanvasInner = () => {
   const [isMiniMapOpen, setIsMiniMapOpen] = useState(true);
   const [connectingSourceId, setConnectingSourceId] = useState<string | null>(null);
   
-  // Estado para criação de novo nó pai
   const [isCreatingRoot, setIsCreatingRoot] = useState(false);
   const [newRootName, setNewRootName] = useState('');
   
-  // Estados para Histórico
   const [past, setPast] = useState<{ nodes: Node[], edges: any[] }[]>([]);
   const [future, setFuture] = useState<{ nodes: Node[], edges: any[] }[]>([]);
   
-  const { fitView, zoomIn, zoomOut, getEdges, getNodes, setViewport, getViewport } = useReactFlow();
+  const { fitView, zoomIn, zoomOut, getEdges, getNodes, setViewport, getViewport, setNodes: setNodesFlow } = useReactFlow();
   const zoom = useStore((s) => s.transform[2]);
 
   const takeSnapshot = useCallback(() => {
@@ -180,6 +179,55 @@ const BoltzCanvasInner = () => {
     ]);
   }, [getEdges, setNodes, setEdges, onStartConnection, onNodeClick, takeSnapshot]);
 
+  const handleOrganize = useCallback(() => {
+    const currentNodes = getNodes();
+    const currentEdges = getEdges();
+    const selectedNodes = currentNodes.filter(n => n.selected);
+    
+    const nodesToOrganize = selectedNodes.length > 0 ? selectedNodes : currentNodes;
+    
+    if (nodesToOrganize.length === 0) return;
+
+    takeSnapshot();
+
+    // Algoritmo simples de organização em árvore
+    const organizeLevel = (parentId: string | null, startX: number, startY: number) => {
+      const children = currentEdges
+        .filter(e => e.source === parentId)
+        .map(e => nodesToOrganize.find(n => n.id === e.target))
+        .filter(Boolean) as Node[];
+
+      if (children.length === 0) return;
+
+      const totalHeight = (children.length - 1) * 120;
+      let currentY = startY - totalHeight / 2;
+
+      children.forEach((child) => {
+        setNodesFlow((nds) => nds.map(n => n.id === child.id ? {
+          ...n,
+          position: { x: startX + 300, y: currentY }
+        } : n));
+        
+        organizeLevel(child.id, startX + 300, currentY);
+        currentY += 120;
+      });
+    };
+
+    // Encontra as raízes (nós sem pais dentro do conjunto a organizar)
+    const roots = nodesToOrganize.filter(node => 
+      !currentEdges.some(e => e.target === node.id && nodesToOrganize.some(n => n.id === e.source))
+    );
+
+    roots.forEach((root, index) => {
+      const rootX = root.position.x;
+      const rootY = root.position.y;
+      organizeLevel(root.id, rootX, rootY);
+    });
+
+    showSuccess("Mapa organizado!");
+    setTimeout(() => fitView({ duration: 800 }), 100);
+  }, [getNodes, getEdges, setNodesFlow, takeSnapshot, fitView]);
+
   const confirmAddRootNode = () => {
     if (!newRootName.trim()) {
       showError("O nome do nó é obrigatório.");
@@ -268,6 +316,9 @@ const BoltzCanvasInner = () => {
         onConnect={onConnect}
         onNodeDragStart={takeSnapshot}
         nodeTypes={nodeTypes}
+        selectionOnDrag={true}
+        selectionMode={SelectionMode.Partial}
+        panOnDrag={[1, 2]} // Permite pan com botão do meio ou dois dedos
         fitView
         className="bg-transparent"
       >
@@ -329,7 +380,10 @@ const BoltzCanvasInner = () => {
                 {isMenuOpen && <span className="text-xs font-medium">Sugerir IA</span>}
               </button>
 
-              <button className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl transition-all group">
+              <button 
+                onClick={handleOrganize}
+                className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl transition-all group"
+              >
                 <Layout size={18} className="text-indigo-400" />
                 {isMenuOpen && <span className="text-xs font-medium">Organizar</span>}
               </button>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -22,68 +22,69 @@ const nodeTypes = {
   mindmap: MindMapNode,
 };
 
-const initialNodes: Node[] = [
-  {
-    id: 'root',
-    type: 'mindmap',
-    data: { label: 'Boltz Flow Root', onAddChild: () => {} },
-    position: { x: 250, y: 250 },
-  },
-];
-
-const initialEdges: Edge[] = [];
-
 const BoltzCanvas = () => {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
+  // Função estável para adicionar nós filhos
+  const addChildNode = useCallback((parentId: string) => {
+    const newNodeId = uuidv4();
+    
+    setNodes((nds) => {
+      const parentNode = nds.find((n) => n.id === parentId);
+      if (!parentNode) return nds;
+
+      // Lógica simples de anti-sobreposição: deslocamento baseado no número de filhos existentes
+      const existingChildrenCount = nds.filter(n => n.id.startsWith(`node-${parentId}`)).length;
+      
+      const newNode: Node = {
+        id: newNodeId,
+        type: 'mindmap',
+        data: { 
+          label: 'Novo Nó', 
+          onAddChild: () => addChildNode(newNodeId) 
+        },
+        position: { 
+          x: parentNode.position.x + 250, 
+          y: parentNode.position.y + (existingChildrenCount * 60) - 30
+        },
+      };
+
+      return [...nds, newNode];
+    });
+
+    setEdges((eds) => [
+      ...eds,
+      {
+        id: `e-${parentId}-${newNodeId}`,
+        source: parentId,
+        target: newNodeId,
+        animated: true,
+        style: { stroke: '#3b82f6', strokeWidth: 2 },
+      }
+    ]);
+  }, [setNodes, setEdges]);
+
+  // Inicialização única dos nós
+  useEffect(() => {
+    const rootId = 'root';
+    setNodes([
+      {
+        id: rootId,
+        type: 'mindmap',
+        data: { 
+          label: 'Boltz Flow Root', 
+          onAddChild: () => addChildNode(rootId) 
+        },
+        position: { x: 250, y: 250 },
+      },
+    ]);
+  }, [addChildNode, setNodes]);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges],
   );
-
-  const addChildNode = useCallback((parentId: string) => {
-    const parentNode = nodes.find((n) => n.id === parentId);
-    if (!parentNode) return;
-
-    const newNodeId = uuidv4();
-    const newNode: Node = {
-      id: newNodeId,
-      type: 'mindmap',
-      data: { 
-        label: 'Novo Nó', 
-        onAddChild: () => addChildNode(newNodeId) 
-      },
-      position: { 
-        x: parentNode.position.x + 200, 
-        y: parentNode.position.y + (Math.random() - 0.5) * 100 
-      },
-    };
-
-    const newEdge: Edge = {
-      id: `e-${parentId}-${newNodeId}`,
-      source: parentId,
-      target: newNodeId,
-      animated: true,
-      style: { stroke: '#3b82f6', strokeWidth: 2 },
-    };
-
-    setNodes((nds) => nds.concat(newNode));
-    setEdges((eds) => eds.concat(newEdge));
-  }, [nodes, setNodes, setEdges]);
-
-  // Injetar a função onAddChild nos nós iniciais e novos
-  React.useEffect(() => {
-    setNodes((nds) => 
-      nds.map((node) => ({
-        ...node,
-        data: {
-          ...node.data,
-          onAddChild: () => addChildNode(node.id)
-        }
-      }))
-    );
-  }, [addChildNode, setNodes]);
 
   return (
     <div className="w-full h-full bg-white relative">

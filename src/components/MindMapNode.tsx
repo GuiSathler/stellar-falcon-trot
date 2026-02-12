@@ -33,7 +33,6 @@ const MindMapNode = ({ id, data, selected }: NodeProps) => {
     );
   };
 
-  // Verifica se este nó é a origem de uma conexão manual em andamento
   const isConnectingSource = data.connectingSourceId === id;
 
   return (
@@ -50,11 +49,8 @@ const MindMapNode = ({ id, data, selected }: NodeProps) => {
         isConnectingSource && "ring-4 ring-blue-400 border-blue-500 animate-pulse"
       )}
     >
-      <Handle 
-        type="target" 
-        position={Position.Left} 
-        className="!w-2.5 !h-2.5 !bg-white !border-2 !border-blue-400 !-left-1.5 hover:!scale-125 transition-transform" 
-      />
+      {/* Handles invisíveis para manter a lógica de conexão do React Flow */}
+      <Handle type="target" position={Position.Left} className="opacity-0 !pointer-events-none" />
       
       <div className="flex items-center gap-2">
         <button 
@@ -149,11 +145,7 @@ const MindMapNode = ({ id, data, selected }: NodeProps) => {
         </button>
       </div>
 
-      <Handle 
-        type="source" 
-        position={Position.Right} 
-        className="!w-2.5 !h-2.5 !bg-white !border-2 !border-blue-400 !-right-1.5 hover:!scale-125 transition-transform" 
-      />
+      <Handle type="source" position={Position.Right} className="opacity-0 !pointer-events-none" />
     </div>
   );
 };

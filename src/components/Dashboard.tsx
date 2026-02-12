@@ -22,7 +22,7 @@ const Dashboard = ({ onSelectMap }: DashboardProps) => {
     const newMap = {
       id: Date.now().toString(),
       title: `Novo Mapa ${maps.length + 1}`,
-      date: new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'Short', year: 'numeric' })
+      date: new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
     };
     setMaps([newMap, ...maps]);
     showSuccess("Novo mapa criado!");

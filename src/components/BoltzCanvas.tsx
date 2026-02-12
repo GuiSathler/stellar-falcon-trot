@@ -10,15 +10,16 @@ import {
   useEdgesState,
   addEdge,
   Connection,
-  Edge,
   Node,
   Panel,
   ReactFlowProvider,
+  useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import MindMapNode from './MindMapNode';
 import { v4 as uuidv4 } from 'uuid';
 import { showSuccess } from '@/utils/toast';
+import { Maximize, Minimize2, Trash, Download, Layout } from 'lucide-react';
 
 const nodeTypes = {
   mindmap: MindMapNode,
@@ -27,6 +28,7 @@ const nodeTypes = {
 const BoltzCanvasInner = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const { fitView, zoomIn, zoomOut } = useReactFlow();
 
   const addChildNode = useCallback((parentId: string) => {
     const newNodeId = uuidv4();
@@ -35,20 +37,26 @@ const BoltzCanvasInner = () => {
       const parentNode = nds.find((n) => n.id === parentId);
       if (!parentNode) return nds;
 
-      // Lógica de Funil: Calcula o offset vertical baseado em quantos filhos o pai já tem
-      const siblings = nds.filter(n => edges.some(e => e.source === parentId && e.target === n.id));
-      const verticalOffset = (siblings.length - (siblings.length / 2)) * 80;
+      // Metodologia Boltz Dynamic Spacing:
+      // Calcula o offset baseado no número de filhos e na profundidade
+      const children = nds.filter(n => edges.some(e => e.source === parentId && e.target === n.id));
+      const index = children.length;
+      
+      // Espaçamento dinâmico: quanto mais filhos, maior a dispersão vertical
+      const verticalGap = 100;
+      const yOffset = (index - (children.length / 2)) * verticalGap;
       
       const newNode: Node = {
         id: newNodeId,
         type: 'mindmap',
         data: { 
-          label: 'Novo Passo', 
+          label: 'Novo Insight', 
+          color: parentNode.data.color || 'Blue',
           onAddChild: () => addChildNode(newNodeId) 
         },
         position: { 
-          x: parentNode.position.x + 280, 
-          y: parentNode.position.y + verticalOffset
+          x: parentNode.position.x + 320, 
+          y: parentNode.position.y + yOffset
         },
       };
 
@@ -62,7 +70,7 @@ const BoltzCanvasInner = () => {
         source: parentId,
         target: newNodeId,
         animated: true,
-        style: { stroke: '#3b82f6', strokeWidth: 2 },
+        style: { stroke: '#94a3b8', strokeWidth: 2 },
       }
     ]);
   }, [edges, setNodes, setEdges]);
@@ -75,10 +83,11 @@ const BoltzCanvasInner = () => {
           id: rootId,
           type: 'mindmap',
           data: { 
-            label: 'Início do Funil', 
+            label: 'Objetivo Central', 
+            color: 'Blue',
             onAddChild: () => addChildNode(rootId) 
           },
-          position: { x: 100, y: 250 },
+          position: { x: 100, y: 300 },
         },
       ]);
     }
@@ -89,28 +98,15 @@ const BoltzCanvasInner = () => {
     [setEdges],
   );
 
-  const exportData = () => {
-    const data = JSON.stringify({ nodes, edges }, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'boltz-flow-export.json';
-    link.click();
-    showSuccess("Mapa exportado com sucesso!");
-  };
-
-  const autoLayout = () => {
-    showSuccess("Layout otimizado aplicado!");
-    // Simulação de layout (em um app real usaríamos dagre)
-    setNodes((nds) => nds.map((n, i) => ({
-      ...n,
-      position: { x: n.position.x, y: n.position.y + (i % 2 === 0 ? 10 : -10) }
-    })));
+  const clearCanvas = () => {
+    if (confirm("Deseja limpar todo o mapa?")) {
+      setNodes([]);
+      showSuccess("Canvas limpo.");
+    }
   };
 
   return (
-    <div className="w-full h-full bg-white relative">
+    <div className="w-full h-full bg-white relative group/canvas">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -119,29 +115,35 @@ const BoltzCanvasInner = () => {
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         fitView
-        className="bg-slate-50"
+        className="bg-slate-50/50"
       >
-        <Background color="#cbd5e1" gap={25} size={1} />
-        <Controls className="bg-white border-none shadow-xl rounded-xl overflow-hidden" />
-        <MiniMap 
-          className="!bg-white !border-gray-200 !rounded-xl !shadow-2xl"
-          nodeColor="#3b82f6"
-          maskColor="rgba(241, 245, 249, 0.4)"
-        />
-        <Panel position="top-right" className="bg-white/90 backdrop-blur-xl p-2 rounded-xl border shadow-lg flex gap-2">
-          <button 
-            onClick={autoLayout}
-            className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
-          >
-            Auto Layout
-          </button>
-          <button 
-            onClick={exportData}
-            className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-blue-200 shadow-lg"
-          >
-            Exportar JSON
-          </button>
+        <Background color="#e2e8f0" gap={30} size={1} />
+        
+        {/* Toolbar Customizada */}
+        <Panel position="bottom-center" className="mb-6">
+          <div className="flex items-center gap-1 bg-white/90 backdrop-blur-xl p-1.5 rounded-2xl border shadow-2xl">
+            <button onClick={() => zoomIn()} className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-600"><Maximize size={18} /></button>
+            <button onClick={() => zoomOut()} className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-600"><Minimize2 size={18} /></button>
+            <div className="w-px h-4 bg-gray-200 mx-1" />
+            <button onClick={() => fitView()} className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-600"><Layout size={18} /></button>
+            <button onClick={clearCanvas} className="p-2 hover:bg-red-50 rounded-xl transition-colors text-red-500"><Trash size={18} /></button>
+            <div className="w-px h-4 bg-gray-200 mx-1" />
+            <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
+              <Download size={14} />
+              Exportar
+            </button>
+          </div>
         </Panel>
+
+        <MiniMap 
+          className="!bg-white/80 !backdrop-blur-md !border-gray-100 !rounded-2xl !shadow-2xl !m-6"
+          nodeColor={(n) => {
+            if (n.data.color === 'Emerald') return '#10b981';
+            if (n.data.color === 'Amber') return '#f59e0b';
+            if (n.data.color === 'Rose') return '#f43f5e';
+            return '#3b82f6';
+          }}
+        />
       </ReactFlow>
     </div>
   );

@@ -18,7 +18,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import MindMapNode from './MindMapNode';
 import { v4 as uuidv4 } from 'uuid';
-import { showSuccess } from '@/utils/toast';
+import { showSuccess, showError } from '@/utils/toast';
 import { 
   Maximize, 
   Minimize2, 
@@ -30,7 +30,6 @@ import {
   ChevronLeft,
   Download,
   MousePointer2,
-  Link2,
   Map as MapIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -44,7 +43,37 @@ const BoltzCanvasInner = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [isMenuOpen, setIsMenuOpen] = useState(true);
   const [isMiniMapOpen, setIsMiniMapOpen] = useState(true);
+  const [connectingSourceId, setConnectingSourceId] = useState<string | null>(null);
+  
   const { fitView, zoomIn, zoomOut, getEdges } = useReactFlow();
+
+  const onStartConnection = useCallback((id: string) => {
+    setConnectingSourceId(id);
+    showSuccess("Selecione o nó de destino para conectar");
+  }, []);
+
+  const onNodeClick = useCallback((targetId: string) => {
+    if (connectingSourceId) {
+      if (connectingSourceId === targetId) {
+        setConnectingSourceId(null);
+        return;
+      }
+
+      // Cria a conexão manual
+      const newEdge = {
+        id: `e-${connectingSourceId}-${targetId}`,
+        source: connectingSourceId,
+        target: targetId,
+        type: 'smoothstep',
+        style: { stroke: '#3b82f6', strokeWidth: 2, strokeDasharray: '5,5' },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' },
+      };
+
+      setEdges((eds) => addEdge(newEdge, eds));
+      setConnectingSourceId(null);
+      showSuccess("Nós conectados com sucesso!");
+    }
+  }, [connectingSourceId, setEdges]);
 
   const addChildNode = useCallback((parentId: string) => {
     const newNodeId = uuidv4();
@@ -53,7 +82,6 @@ const BoltzCanvasInner = () => {
       const parentNode = nds.find((n) => n.id === parentId);
       if (!parentNode) return nds;
 
-      // Obtém as conexões atuais para contar os filhos reais deste pai
       const currentEdges = getEdges();
       const childrenIds = currentEdges
         .filter(e => e.source === parentId)
@@ -63,8 +91,6 @@ const BoltzCanvasInner = () => {
       const verticalGap = 120;
       const xOffset = 300;
       
-      // Algoritmo de Distribuição em Leque:
-      // Distribui os nós verticalmente: 0, +120, -120, +240, -240...
       const multiplier = Math.ceil(childrenCount / 2);
       const direction = childrenCount % 2 === 0 ? 1 : -1;
       const yOffset = childrenCount === 0 ? 0 : direction * (multiplier * verticalGap);
@@ -75,7 +101,10 @@ const BoltzCanvasInner = () => {
         data: { 
           label: 'Novo Tópico', 
           nodeType: 'idea',
-          onAddChild: () => addChildNode(newNodeId) 
+          onAddChild: () => addChildNode(newNodeId),
+          onStartConnection,
+          onNodeClick,
+          connectingSourceId: null // Será atualizado via useEffect
         },
         position: { 
           x: parentNode.position.x + xOffset, 
@@ -97,7 +126,7 @@ const BoltzCanvasInner = () => {
         markerEnd: { type: MarkerType.ArrowClosed, color: '#cbd5e1' },
       }
     ]);
-  }, [getEdges, setNodes, setEdges]);
+  }, [getEdges, setNodes, setEdges, onStartConnection, onNodeClick]);
 
   const addRootNode = useCallback(() => {
     const id = uuidv4();
@@ -107,12 +136,23 @@ const BoltzCanvasInner = () => {
       data: { 
         label: 'Tópico Central', 
         nodeType: 'idea',
-        onAddChild: () => addChildNode(id) 
+        onAddChild: () => addChildNode(id),
+        onStartConnection,
+        onNodeClick,
+        connectingSourceId: null
       },
       position: { x: 100, y: nodes.length * 150 + 100 },
     };
     setNodes((nds) => [...nds, newNode]);
-  }, [nodes.length, setNodes, addChildNode]);
+  }, [nodes.length, setNodes, addChildNode, onStartConnection, onNodeClick]);
+
+  // Sincroniza o estado de conexão com os dados dos nós
+  useEffect(() => {
+    setNodes((nds) => nds.map(n => ({
+      ...n,
+      data: { ...n.data, connectingSourceId }
+    })));
+  }, [connectingSourceId, setNodes]);
 
   useEffect(() => {
     if (nodes.length === 0) addRootNode();
@@ -126,13 +166,12 @@ const BoltzCanvasInner = () => {
         style: { stroke: '#cbd5e1', strokeWidth: 2 },
         markerEnd: { type: MarkerType.ArrowClosed, color: '#cbd5e1' }
       }, eds));
-      showSuccess("Conexão criada!");
     },
     [setEdges],
   );
 
   return (
-    <div className="w-full h-full bg-[#fcfcfc] relative overflow-hidden">
+    <div className={cn("w-full h-full bg-[#fcfcfc] relative overflow-hidden", connectingSourceId && "cursor-crosshair")}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -145,7 +184,6 @@ const BoltzCanvasInner = () => {
       >
         <Background color="#f1f1f1" gap={40} size={1} />
         
-        {/* Sidebar Direita Compacta e Organizada */}
         <Panel position="top-right" className="h-[calc(100%-2rem)] flex items-center pointer-events-none">
           <div className={cn(
             "bg-white border border-gray-100 shadow-2xl rounded-2xl transition-all duration-300 pointer-events-auto flex flex-col overflow-hidden",
@@ -168,11 +206,6 @@ const BoltzCanvasInner = () => {
               </button>
 
               <div className="h-px bg-gray-100 my-1" />
-
-              <button className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl transition-all group">
-                <Link2 size={18} className="text-blue-500 group-hover:scale-110 transition-transform" />
-                {isMenuOpen && <span className="text-xs font-medium">Conectar Nós</span>}
-              </button>
 
               <button className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl transition-all group">
                 <Sparkles size={18} className="text-amber-400 group-hover:scale-110 transition-transform" />
@@ -199,7 +232,6 @@ const BoltzCanvasInner = () => {
           </div>
         </Panel>
 
-        {/* Controles de Navegação */}
         <Panel position="bottom-left" className="m-6 flex gap-2">
           <div className="flex bg-white border border-gray-100 rounded-xl p-1 shadow-lg">
             <button onClick={() => zoomIn()} className="p-2 hover:bg-gray-50 rounded-lg text-gray-400"><Maximize size={16} /></button>
@@ -208,7 +240,6 @@ const BoltzCanvasInner = () => {
           </div>
         </Panel>
 
-        {/* MiniMap Retrátil */}
         <Panel position="bottom-right" className="m-6 flex flex-col items-end gap-2">
           <button 
             onClick={() => setIsMiniMapOpen(!isMiniMapOpen)}
@@ -216,7 +247,6 @@ const BoltzCanvasInner = () => {
               "p-2 bg-white border border-gray-100 rounded-xl shadow-lg transition-all",
               isMiniMapOpen ? "text-blue-600" : "text-gray-400 hover:text-blue-600"
             )}
-            title={isMiniMapOpen ? "Recolher Mapa" : "Expandir Mapa"}
           >
             <MapIcon size={18} />
           </button>

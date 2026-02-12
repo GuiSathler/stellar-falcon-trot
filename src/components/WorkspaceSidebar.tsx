@@ -10,9 +10,12 @@ import {
   LayoutGrid, 
   ChevronLeft,
   Sparkles,
-  Home
+  Home,
+  LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
+import { showSuccess } from '@/utils/toast';
 
 interface SidebarProps {
   activeView: string;
@@ -21,6 +24,11 @@ interface SidebarProps {
 
 const WorkspaceSidebar = ({ activeView, setActiveView }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    showSuccess("Até logo!");
+  };
 
   const menuItems = [
     { id: 'dashboard', label: 'Início', icon: Home },
@@ -34,7 +42,6 @@ const WorkspaceSidebar = ({ activeView, setActiveView }: SidebarProps) => {
       "border-r bg-gray-50/50 h-screen flex flex-col transition-all duration-300 relative",
       isCollapsed ? "w-16" : "w-64"
     )}>
-      {/* Toggle Button */}
       <button 
         onClick={() => setIsCollapsed(!isCollapsed)}
         className="absolute -right-3 top-10 bg-white border border-gray-200 rounded-full p-1 shadow-sm hover:bg-gray-50 z-50"
@@ -42,7 +49,6 @@ const WorkspaceSidebar = ({ activeView, setActiveView }: SidebarProps) => {
         {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
 
-      {/* Logo */}
       <div className={cn("flex items-center gap-2 p-4 mb-4", isCollapsed && "justify-center")}>
         <div className="min-w-[32px] h-8 bg-blue-600 rounded-lg flex items-center justify-center">
           <LayoutGrid className="text-white" size={18} />
@@ -50,7 +56,6 @@ const WorkspaceSidebar = ({ activeView, setActiveView }: SidebarProps) => {
         {!isCollapsed && <h1 className="font-bold text-lg tracking-tight truncate">Boltz Flow</h1>}
       </div>
 
-      {/* Main Navigation */}
       <div className="flex flex-col gap-1 px-2">
         {menuItems.map((item) => (
           <button 
@@ -68,7 +73,6 @@ const WorkspaceSidebar = ({ activeView, setActiveView }: SidebarProps) => {
         ))}
       </div>
 
-      {/* Recent Maps Section */}
       {!isCollapsed && (
         <div className="mt-8 flex flex-col gap-1 px-2 overflow-y-auto">
           <div className="flex items-center justify-between px-2 mb-2">
@@ -88,7 +92,6 @@ const WorkspaceSidebar = ({ activeView, setActiveView }: SidebarProps) => {
         </div>
       )}
 
-      {/* Bottom Actions */}
       <div className="mt-auto border-t p-2 space-y-1">
         <button 
           onClick={() => setActiveView('updates')}
@@ -108,6 +111,17 @@ const WorkspaceSidebar = ({ activeView, setActiveView }: SidebarProps) => {
         )}>
           <Settings size={18} />
           {!isCollapsed && <span>Configurações</span>}
+        </button>
+
+        <button 
+          onClick={handleLogout}
+          className={cn(
+            "flex items-center gap-3 px-3 py-2 rounded-md transition-all text-sm font-medium text-red-500 hover:bg-red-50 w-full",
+            isCollapsed && "justify-center px-0"
+          )}
+        >
+          <LogOut size={18} />
+          {!isCollapsed && <span>Sair</span>}
         </button>
       </div>
     </div>

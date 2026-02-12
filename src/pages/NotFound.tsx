@@ -1,3 +1,5 @@
+"use client";
+
 import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
 
@@ -5,10 +7,9 @@ const NotFound = () => {
   const location = useLocation();
 
   useEffect(() => {
-    console.error(
-      "404 Error: User attempted to access non-existent route:",
-      location.pathname,
-    );
+    // Sanitized logging: we log that a 404 occurred without exposing the full path
+    // which might contain sensitive data like tokens or PII.
+    console.error("404 Error: Page not found");
   }, [location.pathname]);
 
   return (

@@ -12,9 +12,9 @@ interface DashboardProps {
 const Dashboard = ({ onSelectMap }: DashboardProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [maps, setMaps] = useState([
-    { id: '1', title: 'Estratégia de Produto', date: '24 Mai 2024' },
-    { id: '2', title: 'Arquitetura Boltz', date: '22 Mai 2024' },
-    { id: '3', title: 'User Journey', date: '20 Mai 2024' },
+    { id: uuidv4(), title: 'Estratégia de Produto', date: '24 Mai 2024' },
+    { id: uuidv4(), title: 'Arquitetura Boltz', date: '22 Mai 2024' },
+    { id: uuidv4(), title: 'User Journey', date: '20 Mai 2024' },
   ]);
 
   const filteredMaps = maps.filter(m => m.title.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -69,7 +69,6 @@ const Dashboard = ({ onSelectMap }: DashboardProps) => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {/* Pastas (Estático para exemplo) */}
         <div className="group p-6 bg-white border border-gray-100 rounded-3xl hover:border-blue-200 hover:shadow-2xl hover:shadow-blue-50 transition-all cursor-pointer relative overflow-hidden">
           <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/50 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
           <div className="flex items-start justify-between mb-6 relative">
@@ -84,7 +83,6 @@ const Dashboard = ({ onSelectMap }: DashboardProps) => {
           <p className="text-sm text-gray-400 font-medium">12 mapas arquivados</p>
         </div>
 
-        {/* Mapas Dinâmicos */}
         {filteredMaps.map((map) => (
           <div 
             key={map.id}

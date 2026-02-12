@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -14,11 +14,15 @@ import {
   ReactFlowProvider,
   useReactFlow,
   MarkerType,
+  OnNodesChange,
+  OnEdgesChange,
+  applyNodeChanges,
+  applyEdgeChanges,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import MindMapNode from './MindMapNode';
 import { v4 as uuidv4 } from 'uuid';
-import { showSuccess, showError } from '@/utils/toast';
+import { showSuccess } from '@/utils/toast';
 import { 
   Maximize, 
   Minimize2, 
@@ -30,7 +34,9 @@ import {
   ChevronLeft,
   Download,
   MousePointer2,
-  Map as MapIcon
+  Map as MapIcon,
+  Undo2,
+  Redo2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -39,17 +45,72 @@ const nodeTypes = {
 };
 
 const BoltzCanvasInner = () => {
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes] = useNodesState([]);
+  const [edges, setEdges] = useEdgesState([]);
   const [isMenuOpen, setIsMenuOpen] = useState(true);
   const [isMiniMapOpen, setIsMiniMapOpen] = useState(true);
   const [connectingSourceId, setConnectingSourceId] = useState<string | null>(null);
   
-  const { fitView, zoomIn, zoomOut, getEdges } = useReactFlow();
+  // Estados para Histórico
+  const [past, setPast] = useState<{ nodes: Node[], edges: any[] }[]>([]);
+  const [future, setFuture] = useState<{ nodes: Node[], edges: any[] }[]>([]);
+  
+  const { fitView, zoomIn, zoomOut, getEdges, getNodes } = useReactFlow();
+
+  // Função para salvar o estado atual no histórico antes de uma mudança
+  const takeSnapshot = useCallback(() => {
+    setPast((prev) => [...prev, { nodes: getNodes(), edges: getEdges() }].slice(-50)); // Limite de 50 passos
+    setFuture([]); // Limpa o futuro ao realizar nova ação
+  }, [getNodes, getEdges]);
+
+  const undo = useCallback(() => {
+    if (past.length === 0) return;
+    
+    const previous = past[past.length - 1];
+    const newPast = past.slice(0, past.length - 1);
+    
+    setFuture((prev) => [{ nodes: getNodes(), edges: getEdges() }, ...prev]);
+    setNodes(previous.nodes);
+    setEdges(previous.edges);
+    setPast(newPast);
+  }, [past, getNodes, getEdges, setNodes, setEdges]);
+
+  const redo = useCallback(() => {
+    if (future.length === 0) return;
+    
+    const next = future[0];
+    const newFuture = future.slice(1);
+    
+    setPast((prev) => [...prev, { nodes: getNodes(), edges: getEdges() }]);
+    setNodes(next.nodes);
+    setEdges(next.edges);
+    setFuture(newFuture);
+  }, [future, getNodes, getEdges, setNodes, setEdges]);
+
+  // Wrappers para mudanças que devem ser registradas no histórico
+  const onNodesChange: OnNodesChange = useCallback(
+    (changes) => {
+      // Apenas salva no histórico se for uma mudança definitiva (como deletar ou terminar de arrastar)
+      const isSignificant = changes.some(c => c.type === 'remove' || c.type === 'position');
+      if (isSignificant) {
+        // Para posição, idealmente salvaríamos apenas no 'onNodeDragStop', 
+        // mas para simplificar e garantir o 'remove', salvamos aqui.
+      }
+      setNodes((nds) => applyNodeChanges(changes, nds));
+    },
+    [setNodes]
+  );
+
+  const onEdgesChange: OnEdgesChange = useCallback(
+    (changes) => {
+      setEdges((eds) => applyEdgeChanges(changes, eds));
+    },
+    [setEdges]
+  );
 
   const onStartConnection = useCallback((id: string) => {
     setConnectingSourceId(id);
-    showSuccess("Selecione o nó de destino para conectar");
+    showSuccess("Selecione o nó de destino");
   }, []);
 
   const onNodeClick = useCallback((targetId: string) => {
@@ -58,8 +119,7 @@ const BoltzCanvasInner = () => {
         setConnectingSourceId(null);
         return;
       }
-
-      // Cria a conexão manual
+      takeSnapshot();
       const newEdge = {
         id: `e-${connectingSourceId}-${targetId}`,
         source: connectingSourceId,
@@ -68,14 +128,14 @@ const BoltzCanvasInner = () => {
         style: { stroke: '#3b82f6', strokeWidth: 2, strokeDasharray: '5,5' },
         markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' },
       };
-
       setEdges((eds) => addEdge(newEdge, eds));
       setConnectingSourceId(null);
-      showSuccess("Nós conectados com sucesso!");
+      showSuccess("Conectado!");
     }
-  }, [connectingSourceId, setEdges]);
+  }, [connectingSourceId, setEdges, takeSnapshot]);
 
   const addChildNode = useCallback((parentId: string) => {
+    takeSnapshot();
     const newNodeId = uuidv4();
     
     setNodes((nds) => {
@@ -104,7 +164,7 @@ const BoltzCanvasInner = () => {
           onAddChild: () => addChildNode(newNodeId),
           onStartConnection,
           onNodeClick,
-          connectingSourceId: null // Será atualizado via useEffect
+          connectingSourceId: null
         },
         position: { 
           x: parentNode.position.x + xOffset, 
@@ -126,9 +186,10 @@ const BoltzCanvasInner = () => {
         markerEnd: { type: MarkerType.ArrowClosed, color: '#cbd5e1' },
       }
     ]);
-  }, [getEdges, setNodes, setEdges, onStartConnection, onNodeClick]);
+  }, [getEdges, setNodes, setEdges, onStartConnection, onNodeClick, takeSnapshot]);
 
   const addRootNode = useCallback(() => {
+    takeSnapshot();
     const id = uuidv4();
     const newNode: Node = {
       id,
@@ -144,9 +205,8 @@ const BoltzCanvasInner = () => {
       position: { x: 100, y: nodes.length * 150 + 100 },
     };
     setNodes((nds) => [...nds, newNode]);
-  }, [nodes.length, setNodes, addChildNode, onStartConnection, onNodeClick]);
+  }, [nodes.length, setNodes, addChildNode, onStartConnection, onNodeClick, takeSnapshot]);
 
-  // Sincroniza o estado de conexão com os dados dos nós
   useEffect(() => {
     setNodes((nds) => nds.map(n => ({
       ...n,
@@ -160,6 +220,7 @@ const BoltzCanvasInner = () => {
 
   const onConnect = useCallback(
     (params: Connection) => {
+      takeSnapshot();
       setEdges((eds) => addEdge({ 
         ...params, 
         type: 'smoothstep',
@@ -167,7 +228,7 @@ const BoltzCanvasInner = () => {
         markerEnd: { type: MarkerType.ArrowClosed, color: '#cbd5e1' }
       }, eds));
     },
-    [setEdges],
+    [setEdges, takeSnapshot],
   );
 
   return (
@@ -178,12 +239,14 @@ const BoltzCanvasInner = () => {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeDragStart={takeSnapshot} // Salva antes de começar a arrastar
         nodeTypes={nodeTypes}
         fitView
         className="bg-transparent"
       >
         <Background color="#f1f1f1" gap={40} size={1} />
         
+        {/* Sidebar Direita */}
         <Panel position="top-right" className="h-[calc(100%-2rem)] flex items-center pointer-events-none">
           <div className={cn(
             "bg-white border border-gray-100 shadow-2xl rounded-2xl transition-all duration-300 pointer-events-auto flex flex-col overflow-hidden",
@@ -232,7 +295,35 @@ const BoltzCanvasInner = () => {
           </div>
         </Panel>
 
-        <Panel position="bottom-left" className="m-6 flex gap-2">
+        {/* Controles de Navegação e Histórico (Canto Inferior Esquerdo) */}
+        <Panel position="bottom-left" className="m-6 flex flex-col gap-3">
+          {/* Histórico Minimalista */}
+          <div className="flex bg-white border border-gray-100 rounded-xl p-1 shadow-lg">
+            <button 
+              onClick={undo} 
+              disabled={past.length === 0}
+              className={cn(
+                "p-2 rounded-lg transition-colors",
+                past.length === 0 ? "text-gray-200 cursor-not-allowed" : "text-gray-500 hover:bg-gray-50 hover:text-blue-600"
+              )}
+              title="Desfazer (Ctrl+Z)"
+            >
+              <Undo2 size={16} />
+            </button>
+            <button 
+              onClick={redo} 
+              disabled={future.length === 0}
+              className={cn(
+                "p-2 rounded-lg transition-colors",
+                future.length === 0 ? "text-gray-200 cursor-not-allowed" : "text-gray-500 hover:bg-gray-50 hover:text-blue-600"
+              )}
+              title="Refazer (Ctrl+Y)"
+            >
+              <Redo2 size={16} />
+            </button>
+          </div>
+
+          {/* Zoom e Foco */}
           <div className="flex bg-white border border-gray-100 rounded-xl p-1 shadow-lg">
             <button onClick={() => zoomIn()} className="p-2 hover:bg-gray-50 rounded-lg text-gray-400"><Maximize size={16} /></button>
             <button onClick={() => zoomOut()} className="p-2 hover:bg-gray-50 rounded-lg text-gray-400"><Minimize2 size={16} /></button>
@@ -240,6 +331,7 @@ const BoltzCanvasInner = () => {
           </div>
         </Panel>
 
+        {/* MiniMap Retrátil */}
         <Panel position="bottom-right" className="m-6 flex flex-col items-end gap-2">
           <button 
             onClick={() => setIsMiniMapOpen(!isMiniMapOpen)}

@@ -30,7 +30,8 @@ import {
   ChevronLeft,
   Download,
   MousePointer2,
-  Keyboard
+  Link2,
+  Map as MapIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -42,7 +43,8 @@ const BoltzCanvasInner = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [isMenuOpen, setIsMenuOpen] = useState(true);
-  const { fitView, zoomIn, zoomOut, getNodes, getEdges } = useReactFlow();
+  const [isMiniMapOpen, setIsMiniMapOpen] = useState(true);
+  const { fitView, zoomIn, zoomOut, getNodes } = useReactFlow();
 
   const addChildNode = useCallback((parentId: string) => {
     const newNodeId = uuidv4();
@@ -51,9 +53,19 @@ const BoltzCanvasInner = () => {
       const parentNode = nds.find((n) => n.id === parentId);
       if (!parentNode) return nds;
 
+      // Lógica Anti-Sobreposição: Calcula posição baseada nos filhos existentes
       const children = nds.filter(n => edges.some(e => e.source === parentId && e.target === n.id));
-      const verticalGap = 140;
-      const yOffset = (children.length - (children.length / 2)) * verticalGap;
+      const verticalGap = 100;
+      const xOffset = 280;
+      
+      // Encontra a maior e menor posição Y dos filhos para evitar overlap
+      let nextY = parentNode.position.y;
+      if (children.length > 0) {
+        const maxY = Math.max(...children.map(c => c.position.y));
+        nextY = maxY + verticalGap;
+      } else {
+        nextY = parentNode.position.y;
+      }
       
       const newNode: Node = {
         id: newNodeId,
@@ -63,10 +75,7 @@ const BoltzCanvasInner = () => {
           nodeType: 'idea',
           onAddChild: () => addChildNode(newNodeId) 
         },
-        position: { 
-          x: parentNode.position.x + 320, 
-          y: parentNode.position.y + yOffset
-        },
+        position: { x: parentNode.position.x + xOffset, y: nextY },
       };
 
       return [...nds, newNode];
@@ -79,9 +88,8 @@ const BoltzCanvasInner = () => {
         source: parentId,
         target: newNodeId,
         type: 'smoothstep',
-        animated: false,
         style: { stroke: '#cbd5e1', strokeWidth: 2 },
-        markerEnd: { type: MarkerType.ArrowClosed, color: '#cbd5e1', width: 10, height: 10 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#cbd5e1' },
       }
     ]);
   }, [edges, setNodes, setEdges]);
@@ -92,54 +100,29 @@ const BoltzCanvasInner = () => {
       id,
       type: 'mindmap',
       data: { 
-        label: 'Novo Tópico Central', 
+        label: 'Tópico Central', 
         nodeType: 'idea',
         onAddChild: () => addChildNode(id) 
       },
-      position: { x: 100, y: nodes.length * 200 + 100 },
+      position: { x: 100, y: nodes.length * 150 + 100 },
     };
     setNodes((nds) => [...nds, newNode]);
-    showSuccess("Novo tópico central adicionado");
   }, [nodes.length, setNodes, addChildNode]);
-
-  // Atalhos de Teclado
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const selectedNode = getNodes().find(n => n.selected);
-      
-      if (selectedNode) {
-        if (e.key === 'Tab') {
-          e.preventDefault();
-          addChildNode(selectedNode.id);
-        }
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          // Encontrar o pai para criar um irmão
-          const edge = getEdges().find(ed => ed.target === selectedNode.id);
-          if (edge) {
-            addChildNode(edge.source);
-          } else {
-            addRootNode();
-          }
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [getNodes, getEdges, addChildNode, addRootNode]);
 
   useEffect(() => {
     if (nodes.length === 0) addRootNode();
   }, []);
 
   const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge({ 
-      ...params, 
-      type: 'smoothstep',
-      style: { stroke: '#cbd5e1', strokeWidth: 2 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: '#cbd5e1' }
-    }, eds)),
+    (params: Connection) => {
+      setEdges((eds) => addEdge({ 
+        ...params, 
+        type: 'smoothstep',
+        style: { stroke: '#cbd5e1', strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#cbd5e1' }
+      }, eds));
+      showSuccess("Conexão criada!");
+    },
     [setEdges],
   );
 
@@ -155,72 +138,56 @@ const BoltzCanvasInner = () => {
         fitView
         className="bg-transparent"
       >
-        <Background color="#e5e7eb" gap={40} size={1} />
+        <Background color="#f1f1f1" gap={40} size={1} />
         
-        {/* Menu Flutuante Lateral */}
+        {/* Sidebar Direita Compacta */}
         <Panel position="top-right" className="h-[calc(100%-2rem)] flex items-center pointer-events-none">
           <div className={cn(
-            "bg-white/90 backdrop-blur-xl border border-gray-100 shadow-2xl rounded-[2.5rem] transition-all duration-500 pointer-events-auto flex flex-col overflow-hidden",
-            isMenuOpen ? "w-72 p-6" : "w-14 p-2"
+            "bg-white border border-gray-100 shadow-2xl rounded-2xl transition-all duration-300 pointer-events-auto flex flex-col overflow-hidden",
+            isMenuOpen ? "w-56 p-3" : "w-12 p-2"
           )}>
             <button 
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="mb-8 p-2 hover:bg-gray-100 rounded-2xl transition-colors self-end"
+              className="mb-4 p-1.5 hover:bg-gray-50 rounded-lg transition-colors self-end"
             >
-              {isMenuOpen ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+              {isMenuOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
             </button>
 
-            <div className={cn("flex flex-col gap-6", !isMenuOpen && "items-center")}>
+            <div className={cn("flex flex-col gap-2", !isMenuOpen && "items-center")}>
               <button 
                 onClick={addRootNode}
-                className="flex items-center gap-4 p-4 bg-blue-600 text-white rounded-3xl hover:bg-blue-700 hover:scale-105 transition-all shadow-xl shadow-blue-100"
+                className="flex items-center gap-2 p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-md"
               >
-                <PlusCircle size={24} />
-                {isMenuOpen && <span className="text-sm font-black tracking-tight">Novo Tópico</span>}
+                <PlusCircle size={18} />
+                {isMenuOpen && <span className="text-xs font-bold">Novo Pai</span>}
               </button>
 
-              <div className="h-px bg-gray-100 my-2" />
+              <div className="h-px bg-gray-100 my-1" />
 
-              <div className="space-y-2">
-                <button className="w-full flex items-center gap-4 p-3 text-gray-600 hover:bg-gray-50 rounded-2xl transition-all">
-                  <Sparkles size={20} className="text-amber-400" />
-                  {isMenuOpen && <span className="text-sm font-bold">Sugerir com IA</span>}
-                </button>
+              <button className="flex items-center gap-2 p-2 text-gray-500 hover:bg-gray-50 rounded-xl transition-all">
+                <Link2 size={18} className="text-blue-500" />
+                {isMenuOpen && <span className="text-xs font-medium">Conexão Manual</span>}
+              </button>
 
-                <button className="w-full flex items-center gap-4 p-3 text-gray-600 hover:bg-gray-50 rounded-2xl transition-all">
-                  <Layout size={20} className="text-blue-400" />
-                  {isMenuOpen && <span className="text-sm font-bold">Auto-organizar</span>}
-                </button>
+              <button className="flex items-center gap-2 p-2 text-gray-500 hover:bg-gray-50 rounded-xl transition-all">
+                <Sparkles size={18} className="text-amber-400" />
+                {isMenuOpen && <span className="text-xs font-medium">Sugerir com IA</span>}
+              </button>
 
-                <button className="w-full flex items-center gap-4 p-3 text-gray-600 hover:bg-gray-50 rounded-2xl transition-all">
-                  <Settings2 size={20} className="text-purple-400" />
-                  {isMenuOpen && <span className="text-sm font-bold">Temas</span>}
-                </button>
-              </div>
+              <button className="flex items-center gap-2 p-2 text-gray-500 hover:bg-gray-50 rounded-xl transition-all">
+                <Layout size={18} />
+                {isMenuOpen && <span className="text-xs font-medium">Auto-organizar</span>}
+              </button>
 
-              {isMenuOpen && (
-                <div className="mt-4 p-4 bg-gray-50 rounded-3xl border border-gray-100">
-                  <div className="flex items-center gap-2 mb-3 text-gray-400">
-                    <Keyboard size={14} />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Atalhos</span>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs font-bold text-gray-500">
-                      <span>Novo Filho</span>
-                      <kbd className="bg-white px-1.5 py-0.5 rounded border shadow-sm">Tab</kbd>
-                    </div>
-                    <div className="flex justify-between text-xs font-bold text-gray-500">
-                      <span>Novo Irmão</span>
-                      <kbd className="bg-white px-1.5 py-0.5 rounded border shadow-sm">Enter</kbd>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <button className="flex items-center gap-2 p-2 text-gray-500 hover:bg-gray-50 rounded-xl transition-all">
+                <Settings2 size={18} />
+                {isMenuOpen && <span className="text-xs font-medium">Temas</span>}
+              </button>
 
               <div className="mt-auto">
-                <button className="w-full flex items-center gap-4 p-3 text-gray-600 hover:bg-gray-50 rounded-2xl transition-all">
-                  <Download size={20} />
-                  {isMenuOpen && <span className="text-sm font-bold">Exportar JSON</span>}
+                <button className="w-full flex items-center gap-2 p-2 text-gray-500 hover:bg-gray-50 rounded-xl transition-all">
+                  <Download size={18} />
+                  {isMenuOpen && <span className="text-xs font-medium">Exportar</span>}
                 </button>
               </div>
             </div>
@@ -228,20 +195,35 @@ const BoltzCanvasInner = () => {
         </Panel>
 
         {/* Controles de Navegação */}
-        <Panel position="bottom-left" className="m-8 flex gap-3">
-          <div className="flex bg-white/90 backdrop-blur-md border border-gray-100 rounded-[2rem] p-2 shadow-2xl">
-            <button onClick={() => zoomIn()} className="p-3 hover:bg-gray-50 rounded-2xl text-gray-400 transition-colors"><Maximize size={18} /></button>
-            <button onClick={() => zoomOut()} className="p-3 hover:bg-gray-50 rounded-2xl text-gray-400 transition-colors"><Minimize2 size={18} /></button>
-            <button onClick={() => fitView()} className="p-3 hover:bg-gray-50 rounded-2xl text-gray-400 transition-colors"><MousePointer2 size={18} /></button>
+        <Panel position="bottom-left" className="m-6 flex gap-2">
+          <div className="flex bg-white border border-gray-100 rounded-xl p-1 shadow-lg">
+            <button onClick={() => zoomIn()} className="p-2 hover:bg-gray-50 rounded-lg text-gray-400"><Maximize size={16} /></button>
+            <button onClick={() => zoomOut()} className="p-2 hover:bg-gray-50 rounded-lg text-gray-400"><Minimize2 size={16} /></button>
+            <button onClick={() => fitView()} className="p-2 hover:bg-gray-50 rounded-lg text-gray-400"><MousePointer2 size={16} /></button>
           </div>
         </Panel>
 
-        <MiniMap 
-          className="!bg-white/80 !backdrop-blur-xl !border-gray-100 !rounded-[2.5rem] !shadow-2xl !m-8"
-          nodeStrokeColor="#f3f4f6"
-          nodeColor="#ffffff"
-          maskColor="rgba(255, 255, 255, 0.4)"
-        />
+        {/* MiniMap Retrátil */}
+        <Panel position="bottom-right" className="m-6 flex flex-col items-end gap-2">
+          <button 
+            onClick={() => setIsMiniMapOpen(!isMiniMapOpen)}
+            className="p-2 bg-white border border-gray-100 rounded-xl shadow-lg text-gray-500 hover:text-blue-600 transition-colors"
+            title="Alternar MiniMap"
+          >
+            <MapIcon size={18} />
+          </button>
+          
+          {isMiniMapOpen && (
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+              <MiniMap 
+                style={{ width: 150, height: 100, margin: 0 }}
+                nodeStrokeColor="#e2e8f0"
+                nodeColor="#ffffff"
+                maskColor="rgba(255, 255, 255, 0.2)"
+              />
+            </div>
+          )}
+        </Panel>
       </ReactFlow>
     </div>
   );

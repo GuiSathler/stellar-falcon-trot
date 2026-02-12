@@ -1,9 +1,19 @@
 "use client";
 
 import React, { memo, useState } from 'react';
-import { Handle, Position, NodeProps, useReactFlow } from '@xyflow/react';
+import { Handle, Position, NodeProps, useReactFlow, Node } from '@xyflow/react';
 import { Plus, Trash2, Lightbulb, CheckCircle2, HelpCircle, AlertCircle, Link2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+// Definindo a interface para os dados do nó para resolver erros de TS
+export type MindMapNodeData = {
+  label: string;
+  nodeType?: string;
+  onAddChild?: () => void;
+  onStartConnection?: (id: string) => void;
+  onNodeClick?: (id: string) => void;
+  connectingSourceId?: string | null;
+};
 
 const NODE_TYPES = [
   { id: 'idea', icon: Lightbulb, color: 'text-amber-500', label: 'Ideia' },
@@ -12,11 +22,11 @@ const NODE_TYPES = [
   { id: 'alert', icon: AlertCircle, color: 'text-rose-500', label: 'Alerta' },
 ];
 
-const MindMapNode = ({ id, data, selected }: NodeProps) => {
+const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) => {
   const { setNodes } = useReactFlow();
   const [isEditing, setIsEditing] = useState(false);
   const [showTypePicker, setShowTypePicker] = useState(false);
-  const [label, setLabel] = useState(data.label as string);
+  const [label, setLabel] = useState(data.label);
 
   const currentType = NODE_TYPES.find(t => t.id === data.nodeType) || NODE_TYPES[0];
   const Icon = currentType.icon;
@@ -38,7 +48,7 @@ const MindMapNode = ({ id, data, selected }: NodeProps) => {
   return (
     <div 
       onClick={() => {
-        if (data.onNodeClick) data.onNodeClick(id);
+        if (typeof data.onNodeClick === 'function') data.onNodeClick(id);
       }}
       className={cn(
         "group relative bg-white border transition-all duration-300 ease-out",
@@ -122,7 +132,7 @@ const MindMapNode = ({ id, data, selected }: NodeProps) => {
         <button 
           onClick={(e) => {
             e.stopPropagation();
-            if (data.onStartConnection) data.onStartConnection(id);
+            if (typeof data.onStartConnection === 'function') data.onStartConnection(id);
           }}
           className={cn(
             "p-1 border rounded-md shadow-sm transition-colors",

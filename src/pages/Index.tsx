@@ -11,6 +11,7 @@ import { MadeWithDyad } from "@/components/made-with-dyad";
 const Index = () => {
   const [activeView, setActiveView] = useState('dashboard'); // dashboard, editor, updates, settings
   const [selectedMapId, setSelectedMapId] = useState<string | undefined>(undefined);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | undefined>(undefined);
 
   const handleSelectMap = (id: string) => {
     setSelectedMapId(id);
@@ -20,8 +21,7 @@ const Index = () => {
   const renderContent = () => {
     switch (activeView) {
       case 'dashboard':
-      case 'workspace':
-        return <Dashboard onSelectMap={handleSelectMap} />;
+        return <Dashboard onSelectMap={handleSelectMap} workspaceId={activeWorkspaceId} />;
       case 'updates':
         return <ReleaseNotes />;
       case 'settings':
@@ -29,7 +29,7 @@ const Index = () => {
       case 'editor':
         return <BoltzCanvas mapId={selectedMapId} onBack={() => setActiveView('dashboard')} />;
       default:
-        return <Dashboard onSelectMap={handleSelectMap} />;
+        return <Dashboard onSelectMap={handleSelectMap} workspaceId={activeWorkspaceId} />;
     }
   };
 
@@ -41,6 +41,8 @@ const Index = () => {
           setActiveView(view);
           if (view !== 'editor') setSelectedMapId(undefined);
         }} 
+        activeWorkspaceId={activeWorkspaceId}
+        setActiveWorkspaceId={setActiveWorkspaceId}
       />
 
       <main className="flex-1 flex flex-col relative overflow-y-auto bg-white">

@@ -1,31 +1,48 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { FileText, Plus, ChevronRight, Search, Trash2, Loader2, Crown } from 'lucide-react';
+import { FileText, Plus, ChevronRight, Search, Loader2, Crown, Briefcase } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/hooks/usePermissions';
-import { PermissionGate } from './PermissionGate';
+import { ActionMenu } from './ActionMenu';
 
 interface DashboardProps {
   onSelectMap: (id: string) => void;
+  workspaceId?: string;
 }
 
-const Dashboard = ({ onSelectMap }: DashboardProps) => {
+const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [maps, setMaps] = useState<any[]>([]);
+  const [workspaceName, setWorkspaceName] = useState<string | null>(null);
   const { profile } = usePermissions();
 
   const fetchMaps = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('maps')
         .select('*')
         .order('updated_at', { ascending: false });
 
+      if (workspaceId) {
+        query = query.eq('workspace_id', workspaceId);
+        
+        // Buscar nome do workspace
+        const { data: wsData } = await supabase
+          .from('workspaces')
+          .select('name')
+          .eq('id', workspaceId)
+          .single();
+        if (wsData) setWorkspaceName(wsData.name);
+      } else {
+        setWorkspaceName(null);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       setMaps(data || []);
     } catch (error: any) {
@@ -37,7 +54,7 @@ const Dashboard = ({ onSelectMap }: DashboardProps) => {
 
   useEffect(() => {
     fetchMaps();
-  }, []);
+  }, [workspaceId]);
 
   const createNewMap = async () => {
     if (isCreating) return;
@@ -49,11 +66,7 @@ const Dashboard = ({ onSelectMap }: DashboardProps) => {
     setIsCreating(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        showError("Você precisa estar logado para criar um mapa.");
-        return;
-      }
+      if (!user) return showError("Você precisa estar logado.");
 
       const { data, error } = await supabase
         .from('maps')
@@ -61,6 +74,7 @@ const Dashboard = ({ onSelectMap }: DashboardProps) => {
           { 
             title: `Novo Mapa ${maps.length + 1}`, 
             user_id: user.id,
+            workspace_id: workspaceId || null,
             content: { nodes: [], edges: [] }
           }
         ])
@@ -70,32 +84,43 @@ const Dashboard = ({ onSelectMap }: DashboardProps) => {
       if (error) throw error;
       
       setMaps([data, ...maps]);
-      showSuccess("Mapa criado com sucesso!");
+      showSuccess("Mapa criado!");
       onSelectMap(data.id);
     } catch (error: any) {
-      console.error("Erro detalhado ao criar mapa:", error);
-      showError(error.message || "Erro ao criar mapa no banco de dados.");
+      showError("Erro ao criar mapa.");
     } finally {
       setIsCreating(false);
     }
   };
 
-  const handleDeleteMap = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
+  const handleDeleteMap = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este mapa?")) return;
 
     try {
-      const { error } = await supabase
-        .from('maps')
-        .delete()
-        .eq('id', id);
-
+      const { error } = await supabase.from('maps').delete().eq('id', id);
       if (error) throw error;
-      
       setMaps(maps.filter(m => m.id !== id));
       showSuccess("Mapa excluído.");
     } catch (error: any) {
       showError("Erro ao excluir mapa.");
+    }
+  };
+
+  const handleRenameMap = async (id: string, currentTitle: string) => {
+    const newTitle = prompt("Novo título do mapa:", currentTitle);
+    if (!newTitle || newTitle === currentTitle) return;
+
+    try {
+      const { error } = await supabase
+        .from('maps')
+        .update({ title: newTitle })
+        .eq('id', id);
+      
+      if (error) throw error;
+      setMaps(maps.map(m => m.id === id ? { ...m, title: newTitle } : m));
+      showSuccess("Mapa renomeado!");
+    } catch (error) {
+      showError("Erro ao renomear.");
     }
   };
 
@@ -110,10 +135,14 @@ const Dashboard = ({ onSelectMap }: DashboardProps) => {
           <div className="flex items-center gap-2 text-sm text-gray-400 mb-2">
             <span>Workspace</span>
             <ChevronRight size={14} />
-            <span className="text-gray-900 font-semibold">Projetos</span>
+            <span className="text-gray-900 font-semibold">
+              {workspaceName || "Todos os Projetos"}
+            </span>
           </div>
           <h1 className="text-4xl font-black text-gray-900 tracking-tight flex items-center gap-3">
-            Meus Mapas
+            {workspaceName ? (
+              <><Briefcase className="text-blue-600" size={32} /> {workspaceName}</>
+            ) : "Meus Mapas"}
             {profile?.plan_type === 'pro' && (
               <span className="bg-amber-100 text-amber-600 text-xs px-3 py-1 rounded-full flex items-center gap-1">
                 <Crown size={12} /> PRO
@@ -166,14 +195,11 @@ const Dashboard = ({ onSelectMap }: DashboardProps) => {
                 <div className="p-4 bg-gray-50 rounded-2xl group-hover:bg-blue-50 transition-colors">
                   <FileText className="text-gray-400 group-hover:text-blue-600" size={28} />
                 </div>
-                <PermissionGate action="delete" mapOwnerId={map.user_id}>
-                  <button 
-                    onClick={(e) => handleDeleteMap(e, map.id)}
-                    className="text-gray-300 hover:text-red-500 transition-colors p-2"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </PermissionGate>
+                <ActionMenu 
+                  onDelete={() => handleDeleteMap(map.id)} 
+                  onRename={() => handleRenameMap(map.id, map.title)}
+                  label="Mapa" 
+                />
               </div>
               <h3 className="font-bold text-xl text-gray-900 truncate">{map.title}</h3>
               <p className="text-sm text-gray-400 mt-1">

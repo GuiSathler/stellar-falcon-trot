@@ -1,19 +1,16 @@
 export interface MindMap {
   id: string;
   title: string;
-  lastModified: string;
-  thumbnail?: string;
-}
-
-export interface Folder {
-  id: string;
-  name: string;
-  maps: MindMap[];
-  subfolders: Folder[];
+  workspace_id: string;
+  user_id: string;
+  content: any;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Workspace {
   id: string;
   name: string;
-  folders: Folder[];
+  user_id: string;
+  created_at: string;
 }

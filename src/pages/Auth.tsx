@@ -18,15 +18,6 @@ const Auth = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Bypass para Administrador Master
-    if (email === 'guilherme@framebranding.com.br' && password === '1234') {
-      localStorage.setItem('boltz_master_admin', 'true');
-      showSuccess("Acesso Master concedido! Bem-vindo, Guilherme.");
-      navigate('/app');
-      setIsLoading(false);
-      return;
-    }
-
     try {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -50,7 +41,7 @@ const Auth = () => {
           showSuccess("Conta criada com sucesso!");
           navigate('/app');
         } else {
-          showSuccess("Cadastro realizado! Você já pode entrar.");
+          showSuccess("Cadastro realizado! Verifique seu e-mail para confirmar a conta.");
           setIsLogin(true);
         }
       }

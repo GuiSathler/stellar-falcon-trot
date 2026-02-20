@@ -28,7 +28,6 @@ const WorkspaceSidebar = ({ activeView, setActiveView }: SidebarProps) => {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    localStorage.removeItem('boltz_master_admin');
     await supabase.auth.signOut();
     showSuccess("Até logo!");
     navigate('/auth');

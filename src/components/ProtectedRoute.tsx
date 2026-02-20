@@ -16,17 +16,8 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      // Verifica primeiro se há um acesso master local
-      const isMaster = localStorage.getItem('boltz_master_admin') === 'true';
-      if (isMaster) {
-        setIsAuthenticated(true);
-        setIsLoading(false);
-        return;
-      }
-
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (error) throw error;
+        const { data: { user } } = await supabase.auth.getUser();
         setIsAuthenticated(!!user);
       } catch (error) {
         setIsAuthenticated(false);
@@ -38,11 +29,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     checkAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (localStorage.getItem('boltz_master_admin') === 'true') {
-        setIsAuthenticated(true);
-      } else {
-        setIsAuthenticated(!!session);
-      }
+      setIsAuthenticated(!!session);
       setIsLoading(false);
     });
 

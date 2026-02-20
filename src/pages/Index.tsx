@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import WorkspaceSidebar from '@/components/WorkspaceSidebar';
 import BoltzCanvas from '@/components/BoltzCanvas';
 import Dashboard from '@/components/Dashboard';
@@ -12,6 +12,16 @@ const Index = () => {
   const [activeView, setActiveView] = useState('dashboard'); // dashboard, editor, updates, settings
   const [selectedMapId, setSelectedMapId] = useState<string | undefined>(undefined);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | undefined>(undefined);
+
+  // Escutar eventos de seleção de workspace vindos do Dashboard
+  useEffect(() => {
+    const handleWsSelect = (e: any) => {
+      setActiveWorkspaceId(e.detail);
+      setActiveView('dashboard');
+    };
+    window.addEventListener('select-workspace', handleWsSelect);
+    return () => window.removeEventListener('select-workspace', handleWsSelect);
+  }, []);
 
   const handleSelectMap = (id: string) => {
     setSelectedMapId(id);

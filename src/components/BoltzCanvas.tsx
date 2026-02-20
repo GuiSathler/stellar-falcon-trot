@@ -54,25 +54,9 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
   const [isVersionsOpen, setIsVersionsOpen] = useState(false);
   const [versions, setVersions] = useState<any[]>([]);
   
-  const { fitView, getEdges, getNodes, setCenter } = useReactFlow();
+  const { fitView, getEdges, getNodes, setCenter, zoomIn, zoomOut, setViewport, getViewport } = useReactFlow();
   const { undo, redo, takeSnapshot, canUndo, canRedo } = useMindMapHistory();
   const { loadMap, saveMap, isLoading, isSaving } = useMindMapPersistence(mapId);
-
-  // Atalhos de Teclado
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-        e.preventDefault();
-        handleUndo();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
-        e.preventDefault();
-        handleRedo();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nodes, edges]);
 
   const addChildNode = useCallback((parentId: string) => {
     takeSnapshot(getNodes(), getEdges());
@@ -82,12 +66,10 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       const parentNode = nds.find((n) => n.id === parentId);
       if (!parentNode) return nds;
 
-      // Algoritmo de Funil: Evita sobreposição calculando o offset vertical baseado no número de filhos
       const currentEdges = getEdges();
       const children = currentEdges.filter(e => e.source === parentId);
       const childCount = children.length;
       
-      // Espaçamento vertical de 120px entre nós para garantir que não se toquem
       const verticalSpacing = 120;
       const totalHeight = childCount * verticalSpacing;
       const startY = parentNode.position.y - (totalHeight / 2);
@@ -108,7 +90,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
         setCenter(newNode.position.x + 100, newNode.position.y, { zoom: 1, duration: 800 });
       }, 50);
 
-      return [...nds, newNode];
+      return [...nds.map(n => ({ ...n, selected: false })), { ...newNode, selected: true }];
     });
 
     setEdges((eds) => [...eds, {
@@ -120,6 +102,119 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' },
     }]);
   }, [getEdges, setNodes, setEdges, takeSnapshot, setCenter]);
+
+  const addSiblingNode = useCallback((nodeId: string) => {
+    const edge = getEdges().find(e => e.target === nodeId);
+    if (edge) {
+      addChildNode(edge.source);
+    } else {
+      // Se for o nó raiz, cria outro nó raiz próximo
+      addRootNode();
+    }
+  }, [getEdges, addChildNode]);
+
+  const updateSelectedNodeStyle = useCallback((styleUpdate: any) => {
+    setNodes(nds => nds.map(n => {
+      if (n.selected) {
+        const data = n.data as MindMapNodeData;
+        return {
+          ...n,
+          data: {
+            ...data,
+            style: { ...(data.style || {}), ...styleUpdate }
+          }
+        };
+      }
+      return n;
+    }));
+  }, [setNodes]);
+
+  // Atalhos de Teclado (MindMeister Style)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const selectedNode = getNodes().find(n => n.selected);
+      const isInputActive = document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA';
+
+      if (isInputActive && e.key !== 'Escape') return;
+
+      // Undo / Redo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+
+      if (!selectedNode) return;
+
+      // Adicionar Filho (Tab)
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        addChildNode(selectedNode.id);
+      }
+
+      // Adicionar Irmão (Enter)
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        addSiblingNode(selectedNode.id);
+      }
+
+      // Deletar (Delete / Backspace)
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        takeSnapshot(getNodes(), getEdges());
+        setNodes(nds => nds.filter(n => !n.selected));
+      }
+
+      // Editar (F2)
+      if (e.key === 'F2') {
+        e.preventDefault();
+        setNodes(nds => nds.map(n => n.id === selectedNode.id ? { ...n, data: { ...n.data, isNew: true } } : n));
+      }
+
+      // Formatação
+      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+        e.preventDefault();
+        const isBold = (selectedNode.data as MindMapNodeData).style?.fontFamily === 'font-bold';
+        updateSelectedNodeStyle({ fontFamily: isBold ? 'font-sans' : 'font-bold' });
+      }
+
+      // Tamanho da Fonte (Alt + Shift + Up/Down)
+      if (e.altKey && e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        e.preventDefault();
+        const currentSize = (selectedNode.data as MindMapNodeData).style?.fontSize || 14;
+        const newSize = e.key === 'ArrowUp' ? Math.min(currentSize + 2, 48) : Math.max(currentSize - 2, 8);
+        updateSelectedNodeStyle({ fontSize: newSize });
+      }
+
+      // Zoom
+      if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        zoomIn();
+      }
+      if (e.key === '-') {
+        e.preventDefault();
+        zoomOut();
+      }
+      if (e.key === '0') {
+        e.preventDefault();
+        fitView({ duration: 400 });
+      }
+
+      // Navegação por Setas
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && !e.altKey) {
+        e.preventDefault();
+        // Lógica simples de navegação por proximidade ou hierarquia poderia ser adicionada aqui
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [nodes, edges, addChildNode, addSiblingNode, updateSelectedNodeStyle]);
 
   const hydrateNodes = useCallback((nodesToHydrate: Node[]) => {
     return nodesToHydrate.map((node) => ({
@@ -170,7 +265,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       },
       position: { x: 100, y: 100 },
     };
-    setNodes((nds) => [...nds, newNode]);
+    setNodes((nds) => [...nds.map(n => ({ ...n, selected: false })), { ...newNode, selected: true }]);
     setCenter(100, 100, { zoom: 1, duration: 800 });
   };
 

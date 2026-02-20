@@ -41,12 +41,16 @@ const Auth = () => {
           showSuccess("Conta criada com sucesso!");
           navigate('/app');
         } else {
-          showSuccess("Cadastro realizado! Verifique seu e-mail para confirmar a conta.");
+          showSuccess("Verifique seu e-mail para confirmar.");
           setIsLogin(true);
         }
       }
     } catch (error: any) {
-      showError(error.message || "Ocorreu um erro. Verifique seus dados.");
+      // Mensagem minimalista baseada no erro do Supabase
+      const message = error.message === "User already registered" 
+        ? "E-mail já cadastrado." 
+        : error.message || "Erro na autenticação.";
+      showError(message);
     } finally {
       setIsLoading(false);
     }

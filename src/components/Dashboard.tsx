@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { FileText, Plus, ChevronRight, Search, Loader2, Crown, Briefcase, FolderOpen } from 'lucide-react';
+import { FileText, Plus, ChevronRight, Search, Loader2, Crown, FolderOpen, LayoutGrid } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -127,9 +127,10 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
       
       if (error) throw error;
       
-      // Se estivermos em um workspace específico, removemos o mapa da lista local
       if (workspaceId) {
         setMaps(maps.filter(m => m.id !== mapId));
+      } else {
+        fetchData();
       }
       showSuccess("Mapa movido com sucesso!");
     } catch (error) {

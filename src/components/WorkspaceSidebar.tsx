@@ -10,8 +10,8 @@ import {
   LogOut,
   User,
   Plus,
-  Briefcase,
-  Settings
+  Settings,
+  MoreVertical
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
@@ -80,9 +80,11 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
       if (error) throw error;
 
       setWorkspaces(prev => [...prev, data]);
-      showSuccess("Workspace criado!");
+      setActiveWorkspaceId(data.id);
+      setActiveView('dashboard');
+      showSuccess("Workspace criado com sucesso!");
     } catch (error: any) {
-      showError(`Erro: ${error.message}`);
+      showError("Erro ao criar workspace. Verifique se a tabela existe no banco.");
     }
   };
 

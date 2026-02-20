@@ -12,15 +12,17 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { 
   Users, 
-  Hash, 
+  Mail, 
   Shield, 
   Trash2, 
   Loader2, 
   UserPlus,
+  ChevronDown
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
 import { CollaborationRole, Member, ShareResource } from '@/types/collaboration';
+import { cn } from '@/lib/utils';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -29,7 +31,7 @@ interface ShareModalProps {
 }
 
 export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
-  const [shareId, setShareId] = useState('');
+  const [email, setEmail] = useState('');
   const [role, setRole] = useState<CollaborationRole>('viewer');
   const [members, setMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,32 +68,24 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanId = shareId.trim();
-    if (!cleanId) return;
+    if (!email.trim()) return;
 
     setIsInviting(true);
     try {
-      // Buscar usuário pelo Boltz ID (share_id)
+      // 1. Buscar o ID do usuário pelo e-mail (Simulado, pois o Supabase Auth não permite buscar por e-mail publicamente por padrão)
+      // Em um cenário real, você usaria uma Edge Function ou uma tabela de perfis pública.
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('id')
-        .eq('share_id', cleanId)
-        .maybeSingle();
+        .eq('email', email.trim()) // Assumindo que você adicionou email na tabela profiles
+        .single();
 
-      if (profileError) throw profileError;
-
-      if (!profileData) {
-        throw new Error("Boltz ID não encontrado. Verifique o número e tente novamente.");
+      if (profileError || !profileData) {
+        throw new Error("Usuário não encontrado. Certifique-se que ele já possui uma conta.");
       }
 
       const table = resource.type === 'workspace' ? 'workspace_members' : 'map_members';
       const foreignKey = resource.type === 'workspace' ? 'workspace_id' : 'map_id';
-
-      // Verificar se já é membro
-      const isAlreadyMember = members.some(m => m.user_id === profileData.id);
-      if (isAlreadyMember) {
-        throw new Error("Este usuário já possui acesso.");
-      }
 
       const { error } = await supabase
         .from(table)
@@ -103,11 +97,11 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
 
       if (error) throw error;
 
-      showSuccess(`Usuário adicionado com sucesso!`);
-      setShareId('');
+      showSuccess(`Convite enviado para ${email}`);
+      setEmail('');
       fetchMembers();
     } catch (err: any) {
-      showError(err.message || "Erro ao adicionar usuário.");
+      showError(err.message || "Erro ao convidar usuário.");
     } finally {
       setIsInviting(false);
     }
@@ -119,9 +113,9 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
       const { error } = await supabase.from(table).delete().eq('id', memberId);
       if (error) throw error;
       setMembers(prev => prev.filter(m => m.id !== memberId));
-      showSuccess("Acesso removido.");
+      showSuccess("Membro removido.");
     } catch (err) {
-      showError("Erro ao remover acesso.");
+      showError("Erro ao remover membro.");
     }
   };
 
@@ -134,19 +128,19 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
           </div>
           <DialogTitle className="text-2xl font-black tracking-tight">Compartilhar {resource.name}</DialogTitle>
           <DialogDescription className="text-gray-500 font-medium">
-            Insira o Boltz ID do colaborador para dar acesso a este {resource.type === 'workspace' ? 'espaço' : 'mapa'}.
+            Convide colaboradores para trabalhar com você neste {resource.type === 'workspace' ? 'espaço' : 'mapa'}.
           </DialogDescription>
         </DialogHeader>
 
         <div className="py-4 space-y-6">
           <form onSubmit={handleInvite} className="flex gap-2">
             <div className="relative flex-1">
-              <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <Input
-                placeholder="Ex: 12345678"
-                value={shareId}
-                onChange={(e) => setShareId(e.target.value.replace(/\D/g, ''))}
-                className="pl-12 h-12 rounded-2xl border-gray-100 bg-gray-50 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all font-mono"
+                placeholder="E-mail do colaborador"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="pl-12 h-12 rounded-2xl border-gray-100 bg-gray-50 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all"
               />
             </div>
             <select 
@@ -160,7 +154,7 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
             </select>
             <Button 
               type="submit" 
-              disabled={isInviting || !shareId}
+              disabled={isInviting || !email}
               className="h-12 w-12 rounded-2xl bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-100 p-0"
             >
               {isInviting ? <Loader2 className="animate-spin" size={20} /> : <UserPlus size={20} />}
@@ -173,7 +167,7 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
               {isLoading ? (
                 <div className="flex justify-center py-4"><Loader2 className="animate-spin text-blue-600" /></div>
               ) : members.length === 0 ? (
-                <p className="text-center py-4 text-sm text-gray-400 font-medium">Nenhum colaborador adicionado ainda.</p>
+                <p className="text-center py-4 text-sm text-gray-400 font-medium">Nenhum colaborador convidado ainda.</p>
               ) : (
                 members.map((member) => (
                   <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100">
@@ -182,7 +176,7 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
                         <Shield size={14} />
                       </div>
                       <div>
-                        <p className="text-xs font-bold text-gray-700">Colaborador</p>
+                        <p className="text-xs font-bold text-gray-700">ID: {member.user_id.slice(0, 8)}...</p>
                         <p className="text-[10px] font-black uppercase text-blue-400 tracking-wider">{member.role}</p>
                       </div>
                     </div>

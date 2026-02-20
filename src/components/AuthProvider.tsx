@@ -21,44 +21,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const ensureProfileAndIdExists = async (userId: string) => {
-    try {
-      // Busca o perfil atual
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('id, share_id')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (!profile) {
-        // Se não existe perfil, cria um (o trigger do banco cuidará do share_id)
-        await supabase.from('profiles').insert([{ id: userId }]);
-      } else if (!profile.share_id) {
-        // Se o perfil existe mas o share_id está nulo (usuário antigo), 
-        // chamamos uma função ou forçamos o trigger via update
-        // Como temos a função generate_unique_share_id no banco, 
-        // o ideal é que o banco resolva, mas podemos forçar um update 
-        // que dispare a lógica de preenchimento se configurado.
-        
-        // Tentativa de gerar via RPC se disponível ou apenas sinalizar
-        console.log("[AuthProvider] Usuário antigo detectado sem Boltz ID. Sincronizando...");
-        
-        // Forçamos um update no campo updated_at para garantir que o trigger ou 
-        // a lógica de banco seja acionada se houver um BEFORE UPDATE
-        await supabase.from('profiles').update({ updated_at: new Date().toISOString() }).eq('id', userId);
-      }
-    } catch (error) {
-      console.error("Erro ao verificar/garantir Boltz ID:", error);
-    }
-  };
-
   useEffect(() => {
+    // Busca a sessão inicial de forma segura
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          await ensureProfileAndIdExists(session.user.id);
-        }
         setSession(session);
         setUser(session?.user ?? null);
       } catch (error) {
@@ -70,10 +37,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
-        await ensureProfileAndIdExists(session.user.id);
-      }
+    // Escuta mudanças de estado (login, logout, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);

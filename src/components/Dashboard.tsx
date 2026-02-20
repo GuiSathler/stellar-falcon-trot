@@ -43,7 +43,6 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Buscar workspaces (próprios e compartilhados via RLS)
       const { data: wsData } = await supabase
         .from('workspaces')
         .select('*')
@@ -120,6 +119,28 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
     }
   };
 
+  const handleCreateWorkspace = async (name: string, color: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const { data, error } = await supabase
+        .from('workspaces')
+        .insert([{ name, user_id: user.id, color }])
+        .select().single();
+
+      if (error) throw error;
+      
+      setWorkspaces(prev => [...prev, data]);
+      showSuccess("Workspace criado!");
+      // Disparar evento para atualizar a sidebar se necessário
+      window.dispatchEvent(new CustomEvent('workspace-created', { detail: data }));
+    } catch (error: any) {
+      console.error("Erro ao criar workspace:", error);
+      showError(error.message || "Erro ao criar workspace.");
+    }
+  };
+
   const handleDeleteMap = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este mapa?")) return;
     try {
@@ -129,21 +150,6 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
       showSuccess("Mapa excluído");
     } catch (error) {
       showError("Erro ao excluir mapa");
-    }
-  };
-
-  const handleCreateWorkspace = async (name: string, color: string) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data, error } = await supabase
-        .from('workspaces')
-        .insert([{ name, user_id: user?.id, color }])
-        .select().single();
-      if (error) throw error;
-      setWorkspaces([...workspaces, data]);
-      showSuccess("Workspace criado!");
-    } catch (error) {
-      showError("Erro ao criar workspace.");
     }
   };
 

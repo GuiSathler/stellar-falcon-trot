@@ -38,7 +38,7 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
   const getUserProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data: profile, error } = await supabase
+      const { data: profile } = await supabase
         .from('profiles')
         .select('share_id')
         .eq('id', user.id)
@@ -50,18 +50,24 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
           shareId: profile.share_id 
         });
       } else {
-        // Se o ID ainda não existe, tenta novamente em 2 segundos (esperando o trigger)
         setTimeout(getUserProfile, 2000);
       }
-      fetchWorkspaces(user.id);
+      fetchWorkspaces();
     }
   };
 
   useEffect(() => {
     getUserProfile();
+
+    // Ouvir eventos de criação de workspace vindos do Dashboard
+    const handleWsCreated = (e: any) => {
+      setWorkspaces(prev => [...prev, e.detail]);
+    };
+    window.addEventListener('workspace-created', handleWsCreated);
+    return () => window.removeEventListener('workspace-created', handleWsCreated);
   }, []);
 
-  const fetchWorkspaces = async (userId: string) => {
+  const fetchWorkspaces = async () => {
     try {
       const { data, error } = await supabase
         .from('workspaces')

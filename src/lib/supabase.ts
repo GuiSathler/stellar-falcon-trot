@@ -1,16 +1,7 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase as officialClient } from "@/integrations/supabase/client";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+export const supabase = officialClient;
 
-// Log para ajudar no diagnóstico (não exibe a chave completa por segurança)
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase: Variáveis de ambiente não encontradas. Verifique a integração.');
-}
-
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder'
-);
-
-export const isSupabaseConfigured = !!supabaseUrl && !!supabaseAnonKey;
+// Como as chaves estão hardcoded no cliente oficial para este ambiente, 
+// sempre consideramos configurado.
+export const isSupabaseConfigured = true;

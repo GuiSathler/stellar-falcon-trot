@@ -72,7 +72,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nodes, edges]); // Removido 'past' que não existia no escopo
+  }, [nodes, edges]);
 
   const addChildNode = useCallback((parentId: string) => {
     takeSnapshot(getNodes(), getEdges());
@@ -82,8 +82,16 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       const parentNode = nds.find((n) => n.id === parentId);
       if (!parentNode) return nds;
 
-      const children = getEdges().filter(e => e.source === parentId);
-      const offset = children.length * 100 - (children.length * 50);
+      // Algoritmo de Funil: Evita sobreposição calculando o offset vertical baseado no número de filhos
+      const currentEdges = getEdges();
+      const children = currentEdges.filter(e => e.source === parentId);
+      const childCount = children.length;
+      
+      // Espaçamento vertical de 120px entre nós para garantir que não se toquem
+      const verticalSpacing = 120;
+      const totalHeight = childCount * verticalSpacing;
+      const startY = parentNode.position.y - (totalHeight / 2);
+      const newY = startY + (childCount * verticalSpacing);
       
       const newNode = {
         id: newNodeId,
@@ -93,7 +101,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
           isNew: true,
           onAddChild: () => addChildNode(newNodeId),
         },
-        position: { x: parentNode.position.x + 350, y: parentNode.position.y + offset },
+        position: { x: parentNode.position.x + 350, y: newY },
       };
 
       setTimeout(() => {

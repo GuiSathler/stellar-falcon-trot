@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabase';
 import { ActionMenu } from './ActionMenu';
 import { Workspace, MindMap } from '@/types/mindmap';
 import { CreateWorkspaceModal } from './modals/CreateWorkspaceModal';
+import { v4 as uuidv4 } from 'uuid';
 
 interface DashboardProps {
   onSelectMap: (id: string) => void;
@@ -80,13 +81,34 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      // Criar conteúdo inicial com nó raiz
+      const rootNodeId = uuidv4();
+      const initialContent = {
+        nodes: [
+          {
+            id: rootNodeId,
+            type: 'mindmap',
+            data: { label: 'Meu Mapa Mental', isNew: false },
+            position: { x: 250, y: 250 },
+          }
+        ],
+        edges: []
+      };
+
       const { data, error } = await supabase
         .from('maps')
-        .insert([{ title: `Novo Mapa ${maps.length + 1}`, user_id: user.id, workspace_id: workspaceId || null, content: { nodes: [], edges: [] } }])
+        .insert([{ 
+          title: `Novo Mapa ${maps.length + 1}`, 
+          user_id: user.id, 
+          workspace_id: workspaceId || null, 
+          content: initialContent 
+        }])
         .select().single();
+
       if (error) throw error;
       setMaps([data, ...maps]);
-      showSuccess("Mapa criado!");
+      showSuccess("Mapa criado com nó inicial!");
       onSelectMap(data.id);
     } catch (error) {
       showError("Erro ao criar mapa.");

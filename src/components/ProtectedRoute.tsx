@@ -1,8 +1,8 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from './AuthProvider';
+import { supabase } from '@/lib/supabase';
 import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
@@ -10,10 +10,41 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const { user, loading } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const location = useLocation();
 
-  if (loading) {
+  useEffect(() => {
+    // Security: Explicitly clear any legacy bypass keys from LocalStorage
+    localStorage.removeItem('boltz_master_admin');
+
+    const checkAuth = async () => {
+      try {
+        // Use getUser() which is a server-side check, more secure than getSession()
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error || !user) {
+          setIsAuthenticated(false);
+        } else {
+          setIsAuthenticated(true);
+        }
+      } catch (error) {
+        setIsAuthenticated(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (isLoading) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-white">
         <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
@@ -21,8 +52,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     );
   }
 
-  // Se não houver usuário autenticado no Supabase, redireciona para o login
-  if (!user) {
+  if (!isAuthenticated) {
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 

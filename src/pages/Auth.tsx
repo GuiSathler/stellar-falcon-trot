@@ -19,6 +19,9 @@ const Auth = () => {
     e.preventDefault();
     setAttemptedAuth(true);
     
+    // Security: Ensure no legacy bypass keys are set in LocalStorage
+    localStorage.removeItem('boltz_master_admin');
+
     if (!isSupabaseConfigured) {
       showError("Configuração do Supabase ausente. Conecte o projeto primeiro.");
       return;
@@ -28,6 +31,7 @@ const Auth = () => {
 
     try {
       if (isLogin) {
+        // Strictly use Supabase Auth - no hardcoded credentials allowed
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         showSuccess("Bem-vindo de volta!");
@@ -67,7 +71,7 @@ const Auth = () => {
         {attemptedAuth && !isSupabaseConfigured && (
           <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-start gap-3 text-amber-800 text-sm font-medium mb-6 animate-in fade-in zoom-in duration-300">
             <AlertTriangle className="shrink-0 text-amber-500" size={20} />
-            <p>O Supabase não está conectado. Clique no botão de integração para configurar as chaves e depois use o botão Rebuild.</p>
+            <p>O Supabase não está conectado. Configure as chaves no painel de integração.</p>
           </div>
         )}
 

@@ -17,12 +17,10 @@ import {
   Trash2, 
   Loader2, 
   UserPlus,
-  ChevronDown
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
 import { CollaborationRole, Member, ShareResource } from '@/types/collaboration';
-import { cn } from '@/lib/utils';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -68,24 +66,30 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
+    const targetEmail = email.trim().toLowerCase();
+    if (!targetEmail) return;
 
     setIsInviting(true);
     try {
-      // 1. Buscar o ID do usuário pelo e-mail (Simulado, pois o Supabase Auth não permite buscar por e-mail publicamente por padrão)
-      // Em um cenário real, você usaria uma Edge Function ou uma tabela de perfis pública.
+      // Busca o usuário pelo e-mail na tabela de perfis
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('id')
-        .eq('email', email.trim()) // Assumindo que você adicionou email na tabela profiles
+        .eq('email', targetEmail)
         .single();
 
       if (profileError || !profileData) {
-        throw new Error("Usuário não encontrado. Certifique-se que ele já possui uma conta.");
+        throw new Error("Usuário não encontrado. Certifique-se que ele já possui uma conta no Boltz Flow.");
       }
 
       const table = resource.type === 'workspace' ? 'workspace_members' : 'map_members';
       const foreignKey = resource.type === 'workspace' ? 'workspace_id' : 'map_id';
+
+      // Verifica se já é membro
+      const isAlreadyMember = members.some(m => m.user_id === profileData.id);
+      if (isAlreadyMember) {
+        throw new Error("Este usuário já tem acesso a este recurso.");
+      }
 
       const { error } = await supabase
         .from(table)
@@ -97,7 +101,7 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
 
       if (error) throw error;
 
-      showSuccess(`Convite enviado para ${email}`);
+      showSuccess(`Acesso concedido para ${targetEmail}`);
       setEmail('');
       fetchMembers();
     } catch (err: any) {

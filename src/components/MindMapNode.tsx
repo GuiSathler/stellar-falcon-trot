@@ -38,10 +38,13 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
   const [autoAlign, setAutoAlign] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Foco automático ao entrar em modo de edição
   useEffect(() => {
     if (isEditing && textareaRef.current) {
       textareaRef.current.focus();
-      textareaRef.current.setSelectionRange(label.length, label.length);
+      // Move o cursor para o final do texto
+      const length = textareaRef.current.value.length;
+      textareaRef.current.setSelectionRange(length, length);
     }
   }, [isEditing]);
 
@@ -112,6 +115,7 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
           {isEditing ? (
             <textarea
               ref={textareaRef}
+              autoFocus
               className="w-full bg-transparent outline-none resize-none overflow-hidden font-black text-xl text-gray-700 text-center leading-tight"
               value={label}
               rows={label.split('\n').length || 1}

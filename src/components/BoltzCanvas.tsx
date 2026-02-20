@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -54,9 +54,26 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
   const [isVersionsOpen, setIsVersionsOpen] = useState(false);
   const [versions, setVersions] = useState<any[]>([]);
   
-  const { fitView, getEdges, getNodes, setCenter, zoomIn, zoomOut, setViewport, getViewport } = useReactFlow();
+  const { fitView, getEdges, getNodes, setCenter, zoomIn, zoomOut } = useReactFlow();
   const { undo, redo, takeSnapshot, canUndo, canRedo } = useMindMapHistory();
   const { loadMap, saveMap, isLoading, isSaving } = useMindMapPersistence(mapId);
+  
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Salvamento Automático
+  useEffect(() => {
+    if (nodes.length === 0 || isLoading) return;
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      saveMap(nodes, edges);
+    }, 3000); // Salva após 3 segundos de inatividade
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [nodes, edges, saveMap, isLoading]);
 
   const addChildNode = useCallback((parentId: string) => {
     takeSnapshot(getNodes(), getEdges());
@@ -70,8 +87,10 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       const children = currentEdges.filter(e => e.source === parentId);
       const childCount = children.length;
       
-      const verticalSpacing = 120;
-      const totalHeight = childCount * verticalSpacing;
+      // Lógica de alinhamento melhorada para evitar sobreposição
+      const horizontalSpacing = 350;
+      const verticalSpacing = 140;
+      const totalHeight = (childCount) * verticalSpacing;
       const startY = parentNode.position.y - (totalHeight / 2);
       const newY = startY + (childCount * verticalSpacing);
       
@@ -83,7 +102,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
           isNew: true,
           onAddChild: () => addChildNode(newNodeId),
         },
-        position: { x: parentNode.position.x + 350, y: newY },
+        position: { x: parentNode.position.x + horizontalSpacing, y: newY },
       };
 
       setTimeout(() => {
@@ -108,7 +127,6 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     if (edge) {
       addChildNode(edge.source);
     } else {
-      // Se for o nó raiz, cria outro nó raiz próximo
       addRootNode();
     }
   }, [getEdges, addChildNode]);
@@ -129,7 +147,6 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     }));
   }, [setNodes]);
 
-  // Atalhos de Teclado (MindMeister Style)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const selectedNode = getNodes().find(n => n.selected);
@@ -137,7 +154,6 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
 
       if (isInputActive && e.key !== 'Escape') return;
 
-      // Undo / Redo
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
         e.preventDefault();
         handleUndo();
@@ -151,64 +167,25 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
 
       if (!selectedNode) return;
 
-      // Adicionar Filho (Tab)
       if (e.key === 'Tab') {
         e.preventDefault();
         addChildNode(selectedNode.id);
       }
 
-      // Adicionar Irmão (Enter)
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         addSiblingNode(selectedNode.id);
       }
 
-      // Deletar (Delete / Backspace)
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         takeSnapshot(getNodes(), getEdges());
         setNodes(nds => nds.filter(n => !n.selected));
       }
 
-      // Editar (F2)
       if (e.key === 'F2') {
         e.preventDefault();
         setNodes(nds => nds.map(n => n.id === selectedNode.id ? { ...n, data: { ...n.data, isNew: true } } : n));
-      }
-
-      // Formatação
-      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
-        e.preventDefault();
-        const isBold = (selectedNode.data as MindMapNodeData).style?.fontFamily === 'font-bold';
-        updateSelectedNodeStyle({ fontFamily: isBold ? 'font-sans' : 'font-bold' });
-      }
-
-      // Tamanho da Fonte (Alt + Shift + Up/Down)
-      if (e.altKey && e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-        e.preventDefault();
-        const currentSize = (selectedNode.data as MindMapNodeData).style?.fontSize || 14;
-        const newSize = e.key === 'ArrowUp' ? Math.min(currentSize + 2, 48) : Math.max(currentSize - 2, 8);
-        updateSelectedNodeStyle({ fontSize: newSize });
-      }
-
-      // Zoom
-      if (e.key === '+' || e.key === '=') {
-        e.preventDefault();
-        zoomIn();
-      }
-      if (e.key === '-') {
-        e.preventDefault();
-        zoomOut();
-      }
-      if (e.key === '0') {
-        e.preventDefault();
-        fitView({ duration: 400 });
-      }
-
-      // Navegação por Setas
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && !e.altKey) {
-        e.preventDefault();
-        // Lógica simples de navegação por proximidade ou hierarquia poderia ser adicionada aqui
       }
     };
 
@@ -266,7 +243,6 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       position: { x: 100, y: 100 },
     };
     setNodes((nds) => [...nds.map(n => ({ ...n, selected: false })), { ...newNode, selected: true }]);
-    setCenter(100, 100, { zoom: 1, duration: 800 });
   };
 
   const fetchVersions = async () => {
@@ -284,14 +260,11 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     const { data: { user } } = await supabase.auth.getUser();
     const content = { nodes: getNodes(), edges: getEdges() };
     
-    const { error } = await supabase
+    await supabase
       .from('map_versions')
       .insert([{ map_id: mapId, content, user_id: user?.id }]);
     
-    if (!error) {
-      showSuccess("Versão salva com sucesso!");
-      fetchVersions();
-    }
+    fetchVersions();
   };
 
   const restoreVersion = (version: any) => {
@@ -393,9 +366,22 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
 
         <BottomLeftPanel onUndo={handleUndo} onRedo={handleRedo} canUndo={canUndo} canRedo={canRedo} />
 
-        <Panel position="bottom-right" className="m-6 flex flex-col items-end gap-2">
-          <button onClick={() => setIsMiniMapOpen(!isMiniMapOpen)} className={cn("p-2 bg-white border border-gray-100 rounded-xl shadow-lg", isMiniMapOpen ? "text-blue-600" : "text-gray-400")}><MapIcon size={18} /></button>
-          {isMiniMapOpen && <div className="bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden"><MiniMap style={{ width: 140, height: 90 }} /></div>}
+        {/* MiniMap UI Fix: Separando o botão do mapa para evitar sobreposição */}
+        <Panel position="bottom-right" className="m-6 flex flex-col items-end gap-3">
+          {isMiniMapOpen && (
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-200">
+              <MiniMap style={{ width: 180, height: 120 }} />
+            </div>
+          )}
+          <button 
+            onClick={() => setIsMiniMapOpen(!isMiniMapOpen)} 
+            className={cn(
+              "w-12 h-12 bg-white border border-gray-100 rounded-2xl shadow-lg flex items-center justify-center transition-all",
+              isMiniMapOpen ? "text-blue-600" : "text-gray-400 hover:text-blue-600"
+            )}
+          >
+            <MapIcon size={20} />
+          </button>
         </Panel>
       </ReactFlow>
     </div>

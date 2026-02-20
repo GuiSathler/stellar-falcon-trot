@@ -3,22 +3,22 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { LayoutGrid, Mail, Lock, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
+import { LayoutGrid, Mail, Lock, ArrowRight, Loader2, Phone } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
-import { cn } from '@/lib/utils';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
   const navigate = useNavigate();
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Bypass para Administrador Master solicitado
+    // Bypass para Administrador Master
     if (email === 'guilherme@framebranding.com.br' && password === '1234') {
       localStorage.setItem('boltz_master_admin', 'true');
       showSuccess("Acesso Master concedido! Bem-vindo, Guilherme.");
@@ -34,13 +34,28 @@ const Auth = () => {
         showSuccess("Bem-vindo de volta!");
         navigate('/app');
       } else {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) console.error("Auth error:", error.message);
-        showSuccess("Se o e-mail for válido, você receberá um link de confirmação em breve.");
-        setIsLogin(true);
+        const { data, error } = await supabase.auth.signUp({ 
+          email, 
+          password,
+          options: {
+            data: {
+              phone_number: phone,
+            }
+          }
+        });
+        
+        if (error) throw error;
+
+        if (data.user && data.session) {
+          showSuccess("Conta criada com sucesso!");
+          navigate('/app');
+        } else {
+          showSuccess("Cadastro realizado! Você já pode entrar.");
+          setIsLogin(true);
+        }
       }
     } catch (error: any) {
-      showError("Ocorreu um erro. Por favor, verifique seus dados e tente novamente.");
+      showError(error.message || "Ocorreu um erro. Verifique seus dados.");
     } finally {
       setIsLoading(false);
     }
@@ -77,6 +92,23 @@ const Auth = () => {
             </div>
           </div>
 
+          {!isLogin && (
+            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+              <label className="text-sm font-bold text-gray-700 ml-1">Telefone</label>
+              <div className="relative group">
+                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
+                <input 
+                  type="tel" 
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="(00) 00000-0000"
+                  className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:ring-4 focus:ring-blue-50/50 focus:bg-white focus:border-blue-200 outline-none transition-all"
+                />
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <label className="text-sm font-bold text-gray-700 ml-1">Senha</label>
             <div className="relative group">
@@ -95,7 +127,7 @@ const Auth = () => {
           <button 
             type="submit"
             disabled={isLoading}
-            className="w-full bg-blue-600 text-white py-4 rounded-2xl text-sm font-bold hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-xl shadow-blue-100 disabled:opacity-70 disabled:hover:scale-100"
+            className="w-full bg-blue-600 text-white py-4 rounded-2xl text-sm font-bold hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-xl shadow-blue-100 disabled:opacity-70"
           >
             {isLoading ? <Loader2 className="animate-spin" size={20} /> : (
               <>

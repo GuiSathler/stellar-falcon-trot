@@ -66,7 +66,8 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!shareId.trim()) return;
+    const cleanId = shareId.trim();
+    if (!cleanId) return;
 
     setIsInviting(true);
     try {
@@ -74,15 +75,23 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('id')
-        .eq('share_id', shareId.trim())
-        .single();
+        .eq('share_id', cleanId)
+        .maybeSingle();
 
-      if (profileError || !profileData) {
+      if (profileError) throw profileError;
+
+      if (!profileData) {
         throw new Error("Boltz ID não encontrado. Verifique o número e tente novamente.");
       }
 
       const table = resource.type === 'workspace' ? 'workspace_members' : 'map_members';
       const foreignKey = resource.type === 'workspace' ? 'workspace_id' : 'map_id';
+
+      // Verificar se já é membro
+      const isAlreadyMember = members.some(m => m.user_id === profileData.id);
+      if (isAlreadyMember) {
+        throw new Error("Este usuário já possui acesso.");
+      }
 
       const { error } = await supabase
         .from(table)

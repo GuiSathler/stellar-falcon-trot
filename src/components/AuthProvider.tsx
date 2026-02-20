@@ -21,11 +21,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const ensureProfileExists = async (userId: string) => {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .single();
+
+      if (!profile) {
+        // Se o perfil não existe (trigger falhou ou usuário antigo), criamos manualmente
+        // O share_id será gerado pelo banco de dados se o SQL acima foi executado
+        await supabase.from('profiles').insert([{ id: userId }]);
+      }
+    } catch (error) {
+      console.error("Erro ao verificar/criar perfil:", error);
+    }
+  };
+
   useEffect(() => {
-    // Busca a sessão inicial de forma segura
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          await ensureProfileExists(session.user.id);
+        }
         setSession(session);
         setUser(session?.user ?? null);
       } catch (error) {
@@ -37,8 +57,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     initAuth();
 
-    // Escuta mudanças de estado (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        await ensureProfileExists(session.user.id);
+      }
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);

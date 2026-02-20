@@ -35,7 +35,8 @@ import {
   Map as MapIcon,
   Check,
   X,
-  Loader2
+  Loader2,
+  MousePointer2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMindMapHistory } from '@/hooks/useMindMapHistory';
@@ -59,7 +60,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
   const [isCreatingRoot, setIsCreatingRoot] = useState(false);
   const [newRootName, setNewRootName] = useState('');
   
-  const { fitView, getEdges, getNodes, setNodes: setNodesFlow } = useReactFlow();
+  const { fitView, getEdges, getNodes } = useReactFlow();
   const { undo, redo, takeSnapshot, canUndo, canRedo } = useMindMapHistory();
   const { loadMap, saveMap, isLoading, isSaving } = useMindMapPersistence(mapId);
 
@@ -101,7 +102,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
         data: { 
           label: 'Novo Tópico', 
           onAddChild: () => addChildNode(newNodeId),
-          onStartConnection,
+          onStartConnection: () => onStartConnection(newNodeId),
           onNodeClick: (id: string) => handleNodeClick(id),
         },
         position: { x: parentNode.position.x + 300, y: parentNode.position.y },
@@ -157,6 +158,27 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     }
   };
 
+  const confirmAddRootNode = () => {
+    if (!newRootName.trim()) return;
+    takeSnapshot(getNodes(), getEdges());
+    const id = uuidv4();
+    const newNode = {
+      id,
+      type: 'mindmap',
+      data: { 
+        label: newRootName, 
+        onAddChild: () => addChildNode(id),
+        onStartConnection: () => onStartConnection(id),
+        onNodeClick: (id: string) => handleNodeClick(id),
+      },
+      position: { x: 100, y: 100 },
+    };
+    setNodes((nds) => [...nds, newNode]);
+    setNewRootName('');
+    setIsCreatingRoot(false);
+    showSuccess("Nó principal criado!");
+  };
+
   const onNodesChange: OnNodesChange = useCallback((changes) => setNodes((nds) => applyNodeChanges(changes, nds)), [setNodes]);
   const onEdgesChange: OnEdgesChange = useCallback((changes) => setEdges((eds) => applyEdgeChanges(changes, eds)), [setEdges]);
 
@@ -169,6 +191,25 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
 
   return (
     <div className={cn("w-full h-full bg-[#fcfcfc] relative overflow-hidden", connectingSourceId && "cursor-crosshair")}>
+      {nodes.length === 0 && !isCreatingRoot && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+          <div className="bg-white/80 backdrop-blur-sm p-8 rounded-[40px] border-2 border-dashed border-blue-100 text-center animate-in zoom-in duration-500 pointer-events-auto">
+            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <MousePointer2 size={32} />
+            </div>
+            <h3 className="text-xl font-black text-gray-900 mb-2">Mapa Vazio</h3>
+            <p className="text-gray-500 text-sm mb-6 max-w-[240px]">Comece adicionando o tópico central do seu mapa mental.</p>
+            <button 
+              onClick={() => setIsCreatingRoot(true)}
+              className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 flex items-center gap-2 mx-auto"
+            >
+              <PlusCircle size={18} />
+              Criar Tópico Inicial
+            </button>
+          </div>
+        </div>
+      )}
+
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -191,10 +232,27 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
               {isMenuOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
             </button>
             <div className={cn("flex flex-col gap-1.5", !isMenuOpen && "items-center")}>
-              <button onClick={() => setIsCreatingRoot(true)} className="flex items-center gap-2.5 p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-md mb-2">
-                <PlusCircle size={18} />
-                {isMenuOpen && <span className="text-xs font-bold">Novo Pai</span>}
-              </button>
+              {isCreatingRoot && isMenuOpen ? (
+                <div className="p-2 bg-blue-50 rounded-xl border border-blue-100 mb-2 animate-in slide-in-from-top-2">
+                  <input 
+                    autoFocus
+                    className="w-full p-2 text-xs rounded-lg border border-blue-200 outline-none mb-2"
+                    placeholder="Nome do tópico..."
+                    value={newRootName}
+                    onChange={(e) => setNewRootName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && confirmAddRootNode()}
+                  />
+                  <div className="flex gap-1">
+                    <button onClick={confirmAddRootNode} className="flex-1 bg-blue-600 text-white p-1.5 rounded-lg flex justify-center"><Check size={14} /></button>
+                    <button onClick={() => setIsCreatingRoot(false)} className="flex-1 bg-white text-gray-400 p-1.5 rounded-lg border border-gray-200 flex justify-center"><X size={14} /></button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setIsCreatingRoot(true)} className="flex items-center gap-2.5 p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-md mb-2">
+                  <PlusCircle size={18} />
+                  {isMenuOpen && <span className="text-xs font-bold">Novo Pai</span>}
+                </button>
+              )}
               <button className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl"><Sparkles size={18} className="text-amber-400" />{isMenuOpen && <span className="text-xs font-medium">Sugerir IA</span>}</button>
               <button className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl"><Layout size={18} className="text-indigo-400" />{isMenuOpen && <span className="text-xs font-medium">Organizar</span>}</button>
               <button className="flex items-center gap-2.5 p-2 text-gray-500 hover:bg-gray-50 rounded-xl mt-auto"><Download size={18} />{isMenuOpen && <span className="text-xs font-medium">Exportar</span>}</button>

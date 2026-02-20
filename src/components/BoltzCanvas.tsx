@@ -22,7 +22,7 @@ import {
   SelectionMode,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import MindMapNode from './MindMapNode';
+import MindMapNode, { MindMapNodeData } from './MindMapNode';
 import { v4 as uuidv4 } from 'uuid';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/lib/supabase';
@@ -74,121 +74,16 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
   const { fitView, zoomIn, zoomOut, getEdges, getNodes, setViewport, getViewport, setNodes: setNodesFlow } = useReactFlow();
   const zoom = useStore((s) => s.transform[2]);
 
-  // Carregar dados do Supabase
-  useEffect(() => {
-    const loadMap = async () => {
-      if (!mapId) {
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from('maps')
-          .select('content')
-          .eq('id', mapId)
-          .single();
-
-        if (error) throw error;
-
-        if (data?.content) {
-          const { nodes: savedNodes, edges: savedEdges } = data.content;
-          if (savedNodes) setNodes(savedNodes);
-          if (savedEdges) setEdges(savedEdges);
-        }
-      } catch (error) {
-        console.error("Erro ao carregar mapa:", error);
-        showError("Não foi possível carregar o mapa.");
-      } finally {
-        setIsLoading(false);
-        setTimeout(() => fitView({ duration: 800 }), 100);
-      }
-    };
-
-    loadMap();
-  }, [mapId, setNodes, setEdges, fitView]);
-
-  const saveMap = async () => {
-    if (!mapId) return;
-    setIsSaving(true);
-    try {
-      const { error } = await supabase
-        .from('maps')
-        .update({ 
-          content: { nodes: getNodes(), edges: getEdges() },
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', mapId);
-
-      if (error) throw error;
-      showSuccess("Alterações salvas!");
-    } catch (error) {
-      showError("Erro ao salvar alterações.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const takeSnapshot = useCallback(() => {
-    setPast((prev) => [...prev, { nodes: getNodes(), edges: getEdges() }].slice(-50));
-    setFuture([]);
-  }, [getNodes, getEdges]);
-
-  const undo = useCallback(() => {
-    if (past.length === 0) return;
-    const previous = past[past.length - 1];
-    const newPast = past.slice(0, past.length - 1);
-    setFuture((prev) => [{ nodes: getNodes(), edges: getEdges() }, ...prev]);
-    setNodes(previous.nodes);
-    setEdges(previous.edges);
-    setPast(newPast);
-  }, [past, getNodes, getEdges, setNodes, setEdges]);
-
-  const redo = useCallback(() => {
-    if (future.length === 0) return;
-    const next = future[0];
-    const newFuture = future.slice(1);
-    setPast((prev) => [...prev, { nodes: getNodes(), edges: getEdges() }]);
-    setNodes(next.nodes);
-    setEdges(next.edges);
-    setFuture(newFuture);
-  }, [future, getNodes, getEdges, setNodes, setEdges]);
-
-  const onNodesChange: OnNodesChange = useCallback(
-    (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
-    [setNodes]
-  );
-
-  const onEdgesChange: OnEdgesChange = useCallback(
-    (changes) => setEdges((eds) => applyEdgeChanges(changes, eds)),
-    [setEdges]
-  );
-
+  // Funções de interação que precisam ser reatachadas aos nós
   const onStartConnection = useCallback((id: string) => {
     setConnectingSourceId(id);
     showSuccess("Selecione o nó de destino");
   }, []);
 
-  const onNodeClick = useCallback((targetId: string) => {
-    if (connectingSourceId) {
-      if (connectingSourceId === targetId) {
-        setConnectingSourceId(null);
-        return;
-      }
-      takeSnapshot();
-      const newEdge = {
-        id: `e-${connectingSourceId}-${targetId}`,
-        source: connectingSourceId,
-        target: targetId,
-        type: 'smoothstep',
-        style: { stroke: '#3b82f6', strokeWidth: 2, strokeDasharray: '5,5' },
-        markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' },
-      };
-      setEdges((eds) => addEdge(newEdge, eds));
-      setConnectingSourceId(null);
-      showSuccess("Conectado!");
-    }
-  }, [connectingSourceId, setEdges, takeSnapshot]);
+  const takeSnapshot = useCallback(() => {
+    setPast((prev) => [...prev, { nodes: getNodes(), edges: getEdges() }].slice(-50));
+    setFuture([]);
+  }, [getNodes, getEdges]);
 
   const addChildNode = useCallback((parentId: string) => {
     takeSnapshot();
@@ -211,7 +106,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       const direction = childrenCount % 2 === 0 ? 1 : -1;
       const yOffset = childrenCount === 0 ? 0 : direction * (multiplier * verticalGap);
       
-      const newNode: Node = {
+      const newNode: Node<MindMapNodeData> = {
         id: newNodeId,
         type: 'mindmap',
         data: { 
@@ -219,7 +114,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
           nodeType: 'idea',
           onAddChild: () => addChildNode(newNodeId),
           onStartConnection,
-          onNodeClick,
+          onNodeClick: (id) => handleNodeClick(id),
           connectingSourceId: null
         },
         position: { 
@@ -242,7 +137,134 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
         markerEnd: { type: MarkerType.ArrowClosed, color: '#cbd5e1' },
       }
     ]);
-  }, [getEdges, setNodes, setEdges, onStartConnection, onNodeClick, takeSnapshot]);
+  }, [getEdges, setNodes, setEdges, onStartConnection, takeSnapshot]);
+
+  const handleNodeClick = useCallback((targetId: string) => {
+    setConnectingSourceId((currentSourceId) => {
+      if (currentSourceId && currentSourceId !== targetId) {
+        takeSnapshot();
+        const newEdge = {
+          id: `e-${currentSourceId}-${targetId}`,
+          source: currentSourceId,
+          target: targetId,
+          type: 'smoothstep',
+          style: { stroke: '#3b82f6', strokeWidth: 2, strokeDasharray: '5,5' },
+          markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' },
+        };
+        setEdges((eds) => addEdge(newEdge, eds));
+        showSuccess("Conectado!");
+        return null;
+      }
+      return currentSourceId;
+    });
+  }, [setEdges, takeSnapshot]);
+
+  // Função para reidratar nós com as funções necessárias
+  const hydrateNodes = useCallback((nodesToHydrate: Node[]) => {
+    return nodesToHydrate.map((node) => ({
+      ...node,
+      data: {
+        ...node.data,
+        onAddChild: () => addChildNode(node.id),
+        onStartConnection: () => onStartConnection(node.id),
+        onNodeClick: (id: string) => handleNodeClick(id),
+        connectingSourceId: null
+      }
+    }));
+  }, [addChildNode, onStartConnection, handleNodeClick]);
+
+  // Carregar dados do Supabase
+  useEffect(() => {
+    const loadMap = async () => {
+      if (!mapId) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('maps')
+          .select('content')
+          .eq('id', mapId)
+          .single();
+
+        if (error) throw error;
+
+        if (data?.content) {
+          const { nodes: savedNodes, edges: savedEdges } = data.content;
+          if (savedNodes) {
+            setNodes(hydrateNodes(savedNodes));
+          }
+          if (savedEdges) setEdges(savedEdges);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar mapa:", error);
+        showError("Não foi possível carregar o mapa.");
+      } finally {
+        setIsLoading(false);
+        setTimeout(() => fitView({ duration: 800 }), 100);
+      }
+    };
+
+    loadMap();
+  }, [mapId, setNodes, setEdges, fitView, hydrateNodes]);
+
+  const saveMap = async () => {
+    if (!mapId) return;
+    setIsSaving(true);
+    try {
+      // Removemos as funções antes de salvar para evitar erros de serialização
+      const nodesToSave = getNodes().map(({ data, ...rest }) => {
+        const { onAddChild, onStartConnection, onNodeClick, ...serializableData } = data;
+        return { ...rest, data: serializableData };
+      });
+
+      const { error } = await supabase
+        .from('maps')
+        .update({ 
+          content: { nodes: nodesToSave, edges: getEdges() },
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', mapId);
+
+      if (error) throw error;
+      showSuccess("Alterações salvas!");
+    } catch (error) {
+      showError("Erro ao salvar alterações.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const undo = useCallback(() => {
+    if (past.length === 0) return;
+    const previous = past[past.length - 1];
+    const newPast = past.slice(0, past.length - 1);
+    setFuture((prev) => [{ nodes: getNodes(), edges: getEdges() }, ...prev]);
+    setNodes(hydrateNodes(previous.nodes));
+    setEdges(previous.edges);
+    setPast(newPast);
+  }, [past, getNodes, getEdges, setNodes, setEdges, hydrateNodes]);
+
+  const redo = useCallback(() => {
+    if (future.length === 0) return;
+    const next = future[0];
+    const newFuture = future.slice(1);
+    setPast((prev) => [...prev, { nodes: getNodes(), edges: getEdges() }]);
+    setNodes(hydrateNodes(next.nodes));
+    setEdges(next.edges);
+    setFuture(newFuture);
+  }, [future, getNodes, getEdges, setNodes, setEdges, hydrateNodes]);
+
+  const onNodesChange: OnNodesChange = useCallback(
+    (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
+    [setNodes]
+  );
+
+  const onEdgesChange: OnEdgesChange = useCallback(
+    (changes) => setEdges((eds) => applyEdgeChanges(changes, eds)),
+    [setEdges]
+  );
 
   const handleOrganize = useCallback(() => {
     const currentNodes = getNodes();
@@ -306,15 +328,15 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
 
     takeSnapshot();
     const id = uuidv4();
-    const newNode: Node = {
+    const newNode: Node<MindMapNodeData> = {
       id,
       type: 'mindmap',
       data: { 
         label: newRootName, 
         nodeType: 'idea',
         onAddChild: () => addChildNode(id),
-        onStartConnection,
-        onNodeClick,
+        onStartConnection: () => onStartConnection(id),
+        onNodeClick: (id) => handleNodeClick(id),
         connectingSourceId: null
       },
       position: { x: 100, y: nodes.length * 150 + 100 },
@@ -383,7 +405,6 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       >
         <Background color="#f1f1f1" gap={40} size={1} />
         
-        {/* Header do Editor */}
         <Panel position="top-left" className="m-4 flex items-center gap-4 pointer-events-none">
           <button 
             onClick={onBack}
@@ -405,7 +426,6 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
           </div>
         </Panel>
 
-        {/* Sidebar Direita */}
         <Panel position="top-right" className="h-[calc(100%-2rem)] flex items-center pointer-events-none">
           <div className={cn(
             "bg-white border border-gray-100 shadow-2xl rounded-2xl transition-all duration-300 pointer-events-auto flex flex-col overflow-hidden",
@@ -484,7 +504,6 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
           </div>
         </Panel>
 
-        {/* Barra de Ferramentas Unificada */}
         <Panel position="bottom-left" className="m-6">
           <div className="flex items-center gap-3 bg-white border border-gray-100 rounded-2xl p-1.5 shadow-2xl">
             <div className="flex items-center border-r border-gray-100 pr-1.5">
@@ -553,7 +572,6 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
           </div>
         </Panel>
 
-        {/* MiniMap Retrátil */}
         <Panel position="bottom-right" className="m-6 flex flex-col items-end gap-2">
           <button 
             onClick={() => setIsMiniMapOpen(!isMiniMapOpen)}

@@ -6,7 +6,6 @@ import BoltzCanvas from '@/components/BoltzCanvas';
 import Dashboard from '@/components/Dashboard';
 import ReleaseNotes from '@/components/ReleaseNotes';
 import Settings from '@/pages/Settings';
-import { MadeWithDyad } from "@/components/made-with-dyad";
 
 const Index = () => {
   const [activeView, setActiveView] = useState('dashboard'); // dashboard, editor, updates, settings
@@ -58,10 +57,6 @@ const Index = () => {
       <main className="flex-1 flex flex-col relative overflow-y-auto bg-white">
         <div className="flex-1 relative">
           {renderContent()}
-        </div>
-        
-        <div className="absolute bottom-4 right-4 z-20">
-          <MadeWithDyad />
         </div>
       </main>
     </div>

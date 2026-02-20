@@ -69,7 +69,7 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
     <div className="relative group">
       {/* Floating Toolbar */}
       {selected && (
-        <div className="absolute -top-16 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-gray-100 px-3 py-2 rounded-xl shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-200 whitespace-nowrap">
+        <div className="absolute -top-16 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-gray-100 px-3 py-2 rounded-xl shadow-2xl z-[1000] animate-in fade-in slide-in-from-bottom-2 duration-200 whitespace-nowrap">
           <div className="flex items-center gap-3 pr-3 border-r border-gray-100">
             <button className="text-gray-400 hover:text-blue-600 transition-colors"><CheckCircle2 size={18} /></button>
             <button className="text-gray-400 hover:text-blue-600 transition-colors"><GitBranch size={18} /></button>
@@ -147,9 +147,6 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
         >
           <Plus size={20} strokeWidth={3} />
         </button>
-
-        {/* Resize Handle (Bottom Right) */}
-        <div className="absolute bottom-2 right-4 w-2 h-2 border-2 border-blue-400 rounded-full bg-white" />
 
         <Handle type="source" position={Position.Right} className="opacity-0" />
       </div>

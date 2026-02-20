@@ -45,46 +45,56 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
   }, []);
 
   const fetchWorkspaces = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('workspaces')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: true });
-    
-    if (data) setWorkspaces(data);
+    try {
+      const { data, error } = await supabase
+        .from('workspaces')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      if (data) setWorkspaces(data);
+    } catch (err) {
+      console.error("Erro ao buscar workspaces:", err);
+    }
   };
 
   const handleCreateWorkspace = async () => {
     const name = prompt("Nome do novo Workspace:");
-    if (!name) return;
+    if (!name || name.trim() === "") return;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
 
-    const { data, error } = await supabase
-      .from('workspaces')
-      .insert([{ name, user_id: user.id }])
-      .select()
-      .single();
+      const { data, error } = await supabase
+        .from('workspaces')
+        .insert([{ name: name.trim(), user_id: user.id }])
+        .select()
+        .single();
 
-    if (error) {
-      showError("Erro ao criar workspace");
-    } else {
-      setWorkspaces([...workspaces, data]);
-      showSuccess("Workspace criado!");
+      if (error) throw error;
+
+      setWorkspaces(prev => [...prev, data]);
+      showSuccess("Workspace criado com sucesso!");
+    } catch (error: any) {
+      console.error("Erro detalhado ao criar workspace:", error);
+      showError(`Erro: ${error.message || "Verifique se a tabela 'workspaces' existe no Supabase"}`);
     }
   };
 
   const handleDeleteWorkspace = async (id: string) => {
     if (!confirm("Excluir este workspace excluirá todos os mapas dentro dele. Continuar?")) return;
 
-    const { error } = await supabase.from('workspaces').delete().eq('id', id);
-    if (error) {
-      showError("Erro ao excluir workspace");
-    } else {
-      setWorkspaces(workspaces.filter(w => w.id !== id));
+    try {
+      const { error } = await supabase.from('workspaces').delete().eq('id', id);
+      if (error) throw error;
+
+      setWorkspaces(prev => prev.filter(w => w.id !== id));
       if (activeWorkspaceId === id) setActiveWorkspaceId(undefined);
       showSuccess("Workspace removido");
+    } catch (error: any) {
+      showError("Erro ao excluir workspace");
     }
   };
 
@@ -132,7 +142,13 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
         <div className="mt-4 mb-2 px-3 flex items-center justify-between">
           {!isCollapsed && <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Workspaces</span>}
           {!isCollapsed && (
-            <button onClick={handleCreateWorkspace} className="p-1 hover:bg-gray-200 rounded text-gray-500">
+            <button 
+              onClick={(e) => {
+                e.preventDefault();
+                handleCreateWorkspace();
+              }} 
+              className="p-1 hover:bg-gray-200 rounded text-gray-500 transition-colors"
+            >
               <Plus size={14} />
             </button>
           )}

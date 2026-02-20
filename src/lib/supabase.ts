@@ -1,15 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
+// We provide fallback values to prevent the app from crashing during setup,
+// but we log a warning so the user knows why auth/database features won't work yet.
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'Missing Supabase environment variables. Please check your .env file and ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are defined.'
+  console.warn(
+    'Supabase credentials not found. Please click the "Add Supabase" button to connect your project.'
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder-url.supabase.co',
+  supabaseAnonKey || 'placeholder-key'
+);
 
 /**
  * SECURITY GUIDELINES FOR DATABASE PERSISTENCE:
@@ -17,10 +22,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
  * 1. Row Level Security (RLS):
  *    Always enable RLS on all tables in the Supabase dashboard.
  *    Create policies that restrict access based on auth.uid().
- *    Example: CREATE POLICY "Users can only see their own maps" ON maps 
- *    FOR ALL USING (auth.uid() = user_id);
  * 
  * 2. Client-Side Verification:
  *    Always include the user's ID in queries as a secondary check.
- *    Example: supabase.from('maps').select('*').eq('user_id', currentUser.id);
  */

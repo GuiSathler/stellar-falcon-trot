@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Folder, 
   FileText, 
@@ -11,7 +11,8 @@ import {
   ChevronLeft,
   Sparkles,
   Home,
-  LogOut
+  LogOut,
+  User
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
@@ -25,7 +26,16 @@ interface SidebarProps {
 
 const WorkspaceSidebar = ({ activeView, setActiveView }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setUserEmail(user.email || null);
+    };
+    getUser();
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -37,8 +47,6 @@ const WorkspaceSidebar = ({ activeView, setActiveView }: SidebarProps) => {
     { id: 'dashboard', label: 'Início', icon: Home },
     { id: 'workspace', label: 'Workspace', icon: Folder },
   ];
-
-  const recentMaps = ['Estratégia de Produto', 'Arquitetura Boltz', 'User Journey'];
 
   return (
     <div className={cn(
@@ -76,26 +84,19 @@ const WorkspaceSidebar = ({ activeView, setActiveView }: SidebarProps) => {
         ))}
       </div>
 
-      {!isCollapsed && (
-        <div className="mt-8 flex flex-col gap-1 px-2 overflow-y-auto">
-          <div className="flex items-center justify-between px-2 mb-2">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Recentes</p>
-            <Plus size={14} className="text-gray-400 cursor-pointer hover:text-blue-600" />
-          </div>
-          {recentMaps.map((map) => (
-            <button 
-              key={map} 
-              onClick={() => setActiveView('editor')}
-              className="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md transition-colors text-left"
-            >
-              <FileText size={16} className="text-gray-400" />
-              <span className="truncate">{map}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
       <div className="mt-auto border-t p-2 space-y-1">
+        {!isCollapsed && userEmail && (
+          <div className="px-3 py-2 mb-2 bg-blue-50/50 rounded-xl border border-blue-100/50 flex items-center gap-3">
+            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+              <User size={16} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Usuário</p>
+              <p className="text-xs font-bold text-gray-700 truncate">{userEmail}</p>
+            </div>
+          </div>
+        )}
+
         <button 
           onClick={() => setActiveView('updates')}
           className={cn(
@@ -108,10 +109,14 @@ const WorkspaceSidebar = ({ activeView, setActiveView }: SidebarProps) => {
           {!isCollapsed && <span>Novidades</span>}
         </button>
         
-        <button className={cn(
-          "flex items-center gap-3 px-3 py-2 rounded-md transition-all text-sm font-medium text-gray-600 hover:bg-gray-100 w-full",
-          isCollapsed && "justify-center px-0"
-        )}>
+        <button 
+          onClick={() => setActiveView('settings')}
+          className={cn(
+            "flex items-center gap-3 px-3 py-2 rounded-md transition-all text-sm font-medium w-full",
+            activeView === 'settings' ? "bg-blue-50 text-blue-600" : "text-gray-600 hover:bg-gray-100",
+            isCollapsed && "justify-center px-0"
+          )}
+        >
           <Settings size={18} />
           {!isCollapsed && <span>Configurações</span>}
         </button>

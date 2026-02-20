@@ -14,9 +14,9 @@ import {
 } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/lib/supabase';
-import { usePermissions } from '@/hooks/usePermissions';
 import { ActionMenu } from './ActionMenu';
 import { Workspace, MindMap } from '@/types/mindmap';
+import { CreateWorkspaceModal } from './modals/CreateWorkspaceModal';
 
 interface DashboardProps {
   onSelectMap: (id: string) => void;
@@ -30,6 +30,7 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
   const [maps, setMaps] = useState<MindMap[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -118,14 +119,12 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
     }
   };
 
-  const handleCreateWorkspace = async () => {
-    const name = prompt("Nome do novo Workspace:");
-    if (!name?.trim()) return;
+  const handleCreateWorkspace = async (name: string, color: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const { data, error } = await supabase
         .from('workspaces')
-        .insert([{ name: name.trim(), user_id: user?.id, color: '#3b82f6' }])
+        .insert([{ name, user_id: user?.id, color }])
         .select().single();
       if (error) throw error;
       setWorkspaces([...workspaces, data]);
@@ -152,7 +151,7 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
           <p className="text-gray-500 font-medium">Selecione um workspace para começar a trabalhar.</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <button onClick={handleCreateWorkspace} className="group p-8 border-2 border-dashed border-gray-200 rounded-[32px] hover:border-blue-400 hover:bg-blue-50/30 transition-all flex flex-col items-center justify-center text-center gap-4">
+          <button onClick={() => setIsModalOpen(true)} className="group p-8 border-2 border-dashed border-gray-200 rounded-[32px] hover:border-blue-400 hover:bg-blue-50/30 transition-all flex flex-col items-center justify-center text-center gap-4">
             <div className="w-14 h-14 bg-gray-50 group-hover:bg-blue-100 rounded-2xl flex items-center justify-center text-gray-400 group-hover:text-blue-600 transition-colors">
               <PlusCircle size={32} />
             </div>
@@ -189,6 +188,11 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
             </div>
           </div>
         )}
+        <CreateWorkspaceModal 
+          isOpen={isModalOpen} 
+          onClose={() => setIsModalOpen(false)} 
+          onCreate={handleCreateWorkspace} 
+        />
       </div>
     );
   }

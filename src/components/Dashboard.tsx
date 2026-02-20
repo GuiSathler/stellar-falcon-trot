@@ -14,6 +14,7 @@ interface DashboardProps {
 const Dashboard = ({ onSelectMap }: DashboardProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
   const [maps, setMaps] = useState<any[]>([]);
   const { profile } = usePermissions();
 
@@ -39,31 +40,68 @@ const Dashboard = ({ onSelectMap }: DashboardProps) => {
   }, []);
 
   const createNewMap = async () => {
+    if (isCreating) return;
+    
     if (profile?.plan_type === 'free' && maps.length >= 3) {
       return showError("Limite de 3 mapas atingido no plano Free. Faça upgrade!");
     }
 
+    setIsCreating(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      
+      if (!user) {
+        showError("Você precisa estar logado para criar um mapa.");
+        return;
+      }
 
       const { data, error } = await supabase
         .from('maps')
-        .insert([{ title: `Novo Mapa ${maps.length + 1}`, user_id: user.id }])
+        .insert([
+          { 
+            title: `Novo Mapa ${maps.length + 1}`, 
+            user_id: user.id,
+            content: { nodes: [], edges: [] }
+          }
+        ])
         .select()
         .single();
 
       if (error) throw error;
       
       setMaps([data, ...maps]);
-      showSuccess("Mapa criado!");
+      showSuccess("Mapa criado com sucesso!");
       onSelectMap(data.id);
     } catch (error: any) {
-      showError(error.message || "Erro ao criar mapa.");
+      console.error("Erro detalhado ao criar mapa:", error);
+      showError(error.message || "Erro ao criar mapa no banco de dados.");
+    } finally {
+      setIsCreating(false);
     }
   };
 
-  const filteredMaps = maps.filter(m => m.title.toLowerCase().includes(searchQuery.toLowerCase()));
+  const handleDeleteMap = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!confirm("Tem certeza que deseja excluir este mapa?")) return;
+
+    try {
+      const { error } = await supabase
+        .from('maps')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      setMaps(maps.filter(m => m.id !== id));
+      showSuccess("Mapa excluído.");
+    } catch (error: any) {
+      showError("Erro ao excluir mapa.");
+    }
+  };
+
+  const filteredMaps = maps.filter(m => 
+    m.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="p-8 max-w-6xl mx-auto w-full animate-in fade-in duration-500">
@@ -92,21 +130,30 @@ const Dashboard = ({ onSelectMap }: DashboardProps) => {
               placeholder="Pesquisar..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none w-full md:w-64"
+              className="pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none w-full md:w-64 focus:ring-2 focus:ring-blue-100 transition-all"
             />
           </div>
           <button 
             onClick={createNewMap}
-            className="bg-blue-600 text-white px-6 py-3 rounded-2xl text-sm font-bold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-100"
+            disabled={isCreating}
+            className="bg-blue-600 text-white px-6 py-3 rounded-2xl text-sm font-bold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-100 disabled:opacity-50"
           >
-            <Plus size={20} />
+            {isCreating ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
             Novo Mapa
           </button>
         </div>
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-600" size={40} /></div>
+        <div className="flex justify-center py-20">
+          <Loader2 className="animate-spin text-blue-600" size={40} />
+        </div>
+      ) : filteredMaps.length === 0 ? (
+        <div className="text-center py-20 bg-gray-50 rounded-[40px] border-2 border-dashed border-gray-200">
+          <FileText className="mx-auto text-gray-300 mb-4" size={48} />
+          <h3 className="text-lg font-bold text-gray-900">Nenhum mapa encontrado</h3>
+          <p className="text-gray-500">Comece criando seu primeiro mapa mental!</p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {filteredMaps.map((map) => (
@@ -120,11 +167,18 @@ const Dashboard = ({ onSelectMap }: DashboardProps) => {
                   <FileText className="text-gray-400 group-hover:text-blue-600" size={28} />
                 </div>
                 <PermissionGate action="delete" mapOwnerId={map.user_id}>
-                  <button className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={18} /></button>
+                  <button 
+                    onClick={(e) => handleDeleteMap(e, map.id)}
+                    className="text-gray-300 hover:text-red-500 transition-colors p-2"
+                  >
+                    <Trash2 size={18} />
+                  </button>
                 </PermissionGate>
               </div>
               <h3 className="font-bold text-xl text-gray-900 truncate">{map.title}</h3>
-              <p className="text-sm text-gray-400 mt-1">Atualizado em {new Date(map.updated_at).toLocaleDateString()}</p>
+              <p className="text-sm text-gray-400 mt-1">
+                Atualizado em {new Date(map.updated_at).toLocaleDateString()}
+              </p>
             </div>
           ))}
         </div>

@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
-import { LayoutGrid, Mail, Lock, ArrowRight, Loader2, Phone } from 'lucide-react';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { LayoutGrid, Mail, Lock, ArrowRight, Loader2, Phone, AlertTriangle } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 
 const Auth = () => {
@@ -16,6 +16,12 @@ const Auth = () => {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!isSupabaseConfigured) {
+      showError("Configuração do Supabase ausente. Conecte o projeto primeiro.");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -41,16 +47,13 @@ const Auth = () => {
           showSuccess("Conta criada com sucesso!");
           navigate('/app');
         } else {
-          showSuccess("Verifique seu e-mail para confirmar.");
+          showSuccess("Verifique seu e-mail para confirmar o cadastro.");
           setIsLogin(true);
         }
       }
     } catch (error: any) {
-      // Mensagem minimalista baseada no erro do Supabase
-      const message = error.message === "User already registered" 
-        ? "E-mail já cadastrado." 
-        : error.message || "Erro na autenticação.";
-      showError(message);
+      console.error("Erro de Auth:", error);
+      showError(error.message || "Erro na comunicação com o servidor.");
     } finally {
       setIsLoading(false);
     }
@@ -59,6 +62,13 @@ const Auth = () => {
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-6">
       <div className="w-full max-w-md space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        {!isSupabaseConfigured && (
+          <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-start gap-3 text-amber-800 text-sm font-medium mb-6">
+            <AlertTriangle className="shrink-0 text-amber-500" size={20} />
+            <p>O Supabase não está conectado. Clique no botão de integração para configurar as chaves.</p>
+          </div>
+        )}
+
         <div className="text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl shadow-xl shadow-blue-100 mb-6">
             <LayoutGrid className="text-white" size={32} />
@@ -121,8 +131,8 @@ const Auth = () => {
 
           <button 
             type="submit"
-            disabled={isLoading}
-            className="w-full bg-blue-600 text-white py-4 rounded-2xl text-sm font-bold hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-xl shadow-blue-100 disabled:opacity-70"
+            disabled={isLoading || !isSupabaseConfigured}
+            className="w-full bg-blue-600 text-white py-4 rounded-2xl text-sm font-bold hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-xl shadow-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? <Loader2 className="animate-spin" size={20} /> : (
               <>

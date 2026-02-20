@@ -8,6 +8,7 @@ import {
   useNodesState,
   useEdgesState,
   Node,
+  Edge,
   Panel,
   ReactFlowProvider,
   useReactFlow,
@@ -31,6 +32,7 @@ import {
   Loader2,
   History,
   RotateCcw,
+  LayoutTemplate,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMindMapHistory } from '@/hooks/useMindMapHistory';
@@ -54,26 +56,62 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
   const [isVersionsOpen, setIsVersionsOpen] = useState(false);
   const [versions, setVersions] = useState<any[]>([]);
   
-  const { fitView, getEdges, getNodes, setCenter, zoomIn, zoomOut } = useReactFlow();
+  const { fitView, getEdges, getNodes, setCenter } = useReactFlow();
   const { undo, redo, takeSnapshot, canUndo, canRedo } = useMindMapHistory();
   const { loadMap, saveMap, isLoading, isSaving } = useMindMapPersistence(mapId);
   
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Salvamento Automático
+  // Salvamento Automático Aprimorado (2 segundos)
   useEffect(() => {
     if (nodes.length === 0 || isLoading) return;
-
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
 
     autoSaveTimerRef.current = setTimeout(() => {
       saveMap(nodes, edges);
-    }, 3000); // Salva após 3 segundos de inatividade
+    }, 2000);
 
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
   }, [nodes, edges, saveMap, isLoading]);
+
+  // Função de Auto-Layout (Alinhamento Automático)
+  const autoLayout = useCallback(() => {
+    takeSnapshot(getNodes(), getEdges());
+    
+    setNodes((nds) => {
+      const currentEdges = getEdges();
+      const root = nds.find(n => !currentEdges.some(e => e.target === n.id));
+      if (!root) return nds;
+
+      const newNodes = [...nds];
+      const horizontalSpacing = 400;
+      const verticalSpacing = 160;
+
+      const layout = (parentId: string, x: number, y: number) => {
+        const children = currentEdges.filter(e => e.source === parentId).map(e => e.target);
+        const nodeIdx = newNodes.findIndex(n => n.id === parentId);
+        if (nodeIdx !== -1) {
+          newNodes[nodeIdx] = { ...newNodes[nodeIdx], position: { x, y } };
+        }
+
+        const totalHeight = (children.length - 1) * verticalSpacing;
+        let currentY = y - totalHeight / 2;
+
+        children.forEach(childId => {
+          layout(childId, x + horizontalSpacing, currentY);
+          currentY += verticalSpacing;
+        });
+      };
+
+      layout(root.id, root.position.x, root.position.y);
+      return newNodes;
+    });
+
+    setTimeout(() => fitView({ duration: 800 }), 100);
+    showSuccess("Mapa organizado!");
+  }, [getEdges, getNodes, setNodes, takeSnapshot, fitView]);
 
   const addChildNode = useCallback((parentId: string) => {
     takeSnapshot(getNodes(), getEdges());
@@ -87,7 +125,6 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       const children = currentEdges.filter(e => e.source === parentId);
       const childCount = children.length;
       
-      // Lógica de alinhamento melhorada para evitar sobreposição
       const horizontalSpacing = 350;
       const verticalSpacing = 140;
       const totalHeight = (childCount) * verticalSpacing;
@@ -131,22 +168,6 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     }
   }, [getEdges, addChildNode]);
 
-  const updateSelectedNodeStyle = useCallback((styleUpdate: any) => {
-    setNodes(nds => nds.map(n => {
-      if (n.selected) {
-        const data = n.data as MindMapNodeData;
-        return {
-          ...n,
-          data: {
-            ...data,
-            style: { ...(data.style || {}), ...styleUpdate }
-          }
-        };
-      }
-      return n;
-    }));
-  }, [setNodes]);
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const selectedNode = getNodes().find(n => n.selected);
@@ -182,16 +203,11 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
         takeSnapshot(getNodes(), getEdges());
         setNodes(nds => nds.filter(n => !n.selected));
       }
-
-      if (e.key === 'F2') {
-        e.preventDefault();
-        setNodes(nds => nds.map(n => n.id === selectedNode.id ? { ...n, data: { ...n.data, isNew: true } } : n));
-      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nodes, edges, addChildNode, addSiblingNode, updateSelectedNodeStyle]);
+  }, [nodes, edges, addChildNode, addSiblingNode]);
 
   const hydrateNodes = useCallback((nodesToHydrate: Node[]) => {
     return nodesToHydrate.map((node) => ({
@@ -245,36 +261,6 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     setNodes((nds) => [...nds.map(n => ({ ...n, selected: false })), { ...newNode, selected: true }]);
   };
 
-  const fetchVersions = async () => {
-    if (!mapId) return;
-    const { data } = await supabase
-      .from('map_versions')
-      .select('*')
-      .eq('map_id', mapId)
-      .order('created_at', { ascending: false });
-    setVersions(data || []);
-  };
-
-  const saveVersion = async () => {
-    if (!mapId) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    const content = { nodes: getNodes(), edges: getEdges() };
-    
-    await supabase
-      .from('map_versions')
-      .insert([{ map_id: mapId, content, user_id: user?.id }]);
-    
-    fetchVersions();
-  };
-
-  const restoreVersion = (version: any) => {
-    takeSnapshot(getNodes(), getEdges());
-    setNodes(hydrateNodes(version.content.nodes));
-    setEdges(version.content.edges);
-    showSuccess("Versão restaurada!");
-    setIsVersionsOpen(false);
-  };
-
   const onNodesChange: OnNodesChange = useCallback((changes) => {
     setNodes((nds) => applyNodeChanges(changes, nds));
   }, [setNodes]);
@@ -306,7 +292,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       >
         <Background color="#f1f1f1" gap={40} size={1} />
         
-        <TopLeftPanel onBack={onBack} onSave={() => { saveMap(getNodes(), getEdges()); saveVersion(); }} isSaving={isSaving} />
+        <TopLeftPanel onBack={onBack} onSave={() => saveMap(getNodes(), getEdges())} isSaving={isSaving} />
 
         <Panel position="top-right" className="h-[calc(100%-2rem)] flex items-center pointer-events-none">
           <div className={cn("bg-white border border-gray-100 shadow-2xl rounded-2xl transition-all pointer-events-auto flex flex-col overflow-hidden", isMenuOpen ? "w-52 p-3" : "w-12 p-2")}>
@@ -320,11 +306,11 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
               </button>
               
               <button 
-                onClick={() => { setIsVersionsOpen(true); fetchVersions(); }}
+                onClick={autoLayout}
                 className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl"
               >
-                <History size={18} className="text-blue-400" />
-                {isMenuOpen && <span className="text-xs font-medium">Histórico</span>}
+                <LayoutTemplate size={18} className="text-blue-500" />
+                {isMenuOpen && <span className="text-xs font-medium">Auto-Alinhar</span>}
               </button>
 
               <button className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl">
@@ -335,38 +321,9 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
           </div>
         </Panel>
 
-        {isVersionsOpen && (
-          <div className="absolute inset-y-0 right-0 w-80 bg-white border-l border-gray-100 shadow-2xl z-[100] animate-in slide-in-from-right duration-300">
-            <div className="p-6 border-b border-gray-50 flex items-center justify-between">
-              <h3 className="font-black text-gray-900">Histórico de Versões</h3>
-              <button onClick={() => setIsVersionsOpen(false)} className="text-gray-400 hover:text-gray-600">
-                <ChevronRight size={20} />
-              </button>
-            </div>
-            <div className="p-4 space-y-3 overflow-y-auto h-[calc(100%-80px)]">
-              {versions.map((v) => (
-                <div key={v.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 group">
-                  <p className="text-xs font-bold text-gray-400 mb-1 uppercase tracking-widest">
-                    {new Date(v.created_at).toLocaleString()}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-gray-700">Snapshot Automático</span>
-                    <button 
-                      onClick={() => restoreVersion(v)}
-                      className="p-2 bg-white text-blue-600 rounded-xl shadow-sm opacity-0 group-hover:opacity-100 transition-all hover:bg-blue-600 hover:text-white"
-                    >
-                      <RotateCcw size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         <BottomLeftPanel onUndo={handleUndo} onRedo={handleRedo} canUndo={canUndo} canRedo={canRedo} />
 
-        {/* MiniMap UI Fix: Separando o botão do mapa para evitar sobreposição */}
+        {/* MiniMap no canto inferior direito para evitar sobreposição com controles */}
         <Panel position="bottom-right" className="m-6 flex flex-col items-end gap-3">
           {isMiniMapOpen && (
             <div className="bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-200">

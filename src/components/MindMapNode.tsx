@@ -35,16 +35,16 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
   const { setNodes } = useReactFlow();
   const [isEditing, setIsEditing] = useState(data.isNew || false);
   const [label, setLabel] = useState(data.label);
-  const [autoAlign, setAutoAlign] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Foco automático ao entrar em modo de edição
+  // Foco e seleção automática ao entrar em modo de edição
   useEffect(() => {
     if (isEditing && textareaRef.current) {
-      textareaRef.current.focus();
-      // Move o cursor para o final do texto
-      const length = textareaRef.current.value.length;
-      textareaRef.current.setSelectionRange(length, length);
+      const timer = setTimeout(() => {
+        textareaRef.current?.focus();
+        textareaRef.current?.select(); // Seleciona tudo para sobrescrever rápido
+      }, 50);
+      return () => clearTimeout(timer);
     }
   }, [isEditing]);
 
@@ -84,15 +84,6 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
             <button className="text-gray-400 hover:text-blue-600 transition-colors"><Link2 size={18} /></button>
           </div>
 
-          <div className="flex items-center gap-2 px-3 border-r border-gray-100">
-            <Switch 
-              checked={autoAlign} 
-              onCheckedChange={setAutoAlign}
-              className="data-[state=checked]:bg-blue-500 scale-75"
-            />
-            <span className="text-[11px] font-bold text-blue-300">Alinhamento automático</span>
-          </div>
-
           <div className="flex items-center gap-3 pl-3">
             <button className="text-gray-400 hover:text-blue-600 transition-colors"><PaintBucket size={18} /></button>
             <button className="text-gray-400 hover:text-blue-600 transition-colors"><Baseline size={18} /></button>
@@ -115,7 +106,6 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
           {isEditing ? (
             <textarea
               ref={textareaRef}
-              autoFocus
               className="w-full bg-transparent outline-none resize-none overflow-hidden font-black text-xl text-gray-700 text-center leading-tight"
               value={label}
               rows={label.split('\n').length || 1}

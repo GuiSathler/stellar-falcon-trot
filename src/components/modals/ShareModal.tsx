@@ -17,6 +17,7 @@ import {
   Trash2, 
   Loader2, 
   UserPlus,
+  AlertCircle
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
@@ -43,12 +44,7 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
 
       const { data, error } = await supabase
         .from(table)
-        .select(`
-          id,
-          user_id,
-          role,
-          created_at
-        `)
+        .select(`id, user_id, role, created_at`)
         .eq(foreignKey, resource.id);
 
       if (error) throw error;
@@ -74,12 +70,14 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
       // Busca o usuário pelo e-mail na tabela de perfis
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, email')
         .eq('email', targetEmail)
-        .single();
+        .maybeSingle();
 
-      if (profileError || !profileData) {
-        throw new Error("Usuário não encontrado. Certifique-se que ele já possui uma conta no Boltz Flow.");
+      if (profileError) throw profileError;
+
+      if (!profileData) {
+        throw new Error("Usuário não encontrado. O colaborador precisa ter uma conta ativa no Boltz Flow para ser convidado.");
       }
 
       const table = resource.type === 'workspace' ? 'workspace_members' : 'map_members';
@@ -132,7 +130,7 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
           </div>
           <DialogTitle className="text-2xl font-black tracking-tight">Compartilhar {resource.name}</DialogTitle>
           <DialogDescription className="text-gray-500 font-medium">
-            Convide colaboradores para trabalhar com você neste {resource.type === 'workspace' ? 'espaço' : 'mapa'}.
+            Convide colaboradores pelo e-mail cadastrado no Boltz Flow.
           </DialogDescription>
         </DialogHeader>
 
@@ -171,7 +169,10 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
               {isLoading ? (
                 <div className="flex justify-center py-4"><Loader2 className="animate-spin text-blue-600" /></div>
               ) : members.length === 0 ? (
-                <p className="text-center py-4 text-sm text-gray-400 font-medium">Nenhum colaborador convidado ainda.</p>
+                <div className="flex flex-col items-center gap-2 py-8 text-gray-400">
+                  <AlertCircle size={24} strokeWidth={1.5} />
+                  <p className="text-sm font-medium">Nenhum colaborador convidado.</p>
+                </div>
               ) : (
                 members.map((member) => (
                   <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100">

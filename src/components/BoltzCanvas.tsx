@@ -25,6 +25,7 @@ import '@xyflow/react/dist/style.css';
 import MindMapNode from './MindMapNode';
 import { v4 as uuidv4 } from 'uuid';
 import { showSuccess, showError } from '@/utils/toast';
+import { supabase } from '@/lib/supabase';
 import { 
   Layout, 
   PlusCircle, 
@@ -40,7 +41,9 @@ import {
   Minus,
   Target,
   Check,
-  X
+  X,
+  Save,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -48,11 +51,18 @@ const nodeTypes = {
   mindmap: MindMapNode,
 };
 
-const BoltzCanvasInner = () => {
+interface BoltzCanvasProps {
+  mapId?: string;
+  onBack?: () => void;
+}
+
+const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
   const [nodes, setNodes] = useNodesState([]);
   const [edges, setEdges] = useEdgesState([]);
   const [isMenuOpen, setIsMenuOpen] = useState(true);
   const [isMiniMapOpen, setIsMiniMapOpen] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(!!mapId);
   const [connectingSourceId, setConnectingSourceId] = useState<string | null>(null);
   
   const [isCreatingRoot, setIsCreatingRoot] = useState(false);
@@ -63,6 +73,61 @@ const BoltzCanvasInner = () => {
   
   const { fitView, zoomIn, zoomOut, getEdges, getNodes, setViewport, getViewport, setNodes: setNodesFlow } = useReactFlow();
   const zoom = useStore((s) => s.transform[2]);
+
+  // Carregar dados do Supabase
+  useEffect(() => {
+    const loadMap = async () => {
+      if (!mapId) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('maps')
+          .select('content')
+          .eq('id', mapId)
+          .single();
+
+        if (error) throw error;
+
+        if (data?.content) {
+          const { nodes: savedNodes, edges: savedEdges } = data.content;
+          if (savedNodes) setNodes(savedNodes);
+          if (savedEdges) setEdges(savedEdges);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar mapa:", error);
+        showError("Não foi possível carregar o mapa.");
+      } finally {
+        setIsLoading(false);
+        setTimeout(() => fitView({ duration: 800 }), 100);
+      }
+    };
+
+    loadMap();
+  }, [mapId, setNodes, setEdges, fitView]);
+
+  const saveMap = async () => {
+    if (!mapId) return;
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('maps')
+        .update({ 
+          content: { nodes: getNodes(), edges: getEdges() },
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', mapId);
+
+      if (error) throw error;
+      showSuccess("Alterações salvas!");
+    } catch (error) {
+      showError("Erro ao salvar alterações.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const takeSnapshot = useCallback(() => {
     setPast((prev) => [...prev, { nodes: getNodes(), edges: getEdges() }].slice(-50));
@@ -190,11 +255,9 @@ const BoltzCanvasInner = () => {
 
     takeSnapshot();
 
-    // Algoritmo de organização em árvore com proteção contra referências circulares
     const visited = new Set<string>();
     
     const organizeLevel = (parentId: string | null, startX: number, startY: number) => {
-      // Proteção contra ciclos: se já visitamos este nó nesta ramificação, paramos
       if (parentId && visited.has(parentId)) return;
       if (parentId) visited.add(parentId);
 
@@ -218,12 +281,9 @@ const BoltzCanvasInner = () => {
         currentY += 120;
       });
       
-      // Removemos do set após processar os filhos para permitir que o nó seja 
-      // alcançado por outros caminhos se necessário, mas não em ciclos infinitos
       if (parentId) visited.delete(parentId);
     };
 
-    // Encontra as raízes (nós sem pais dentro do conjunto a organizar)
     const roots = nodesToOrganize.filter(node => 
       !currentEdges.some(e => e.target === node.id && nodesToOrganize.some(n => n.id === e.source))
     );
@@ -266,26 +326,6 @@ const BoltzCanvasInner = () => {
   };
 
   useEffect(() => {
-    if (nodes.length === 0) {
-      const id = uuidv4();
-      const initialNode: Node = {
-        id,
-        type: 'mindmap',
-        data: { 
-          label: 'Meu novo mapa mental', 
-          nodeType: 'idea',
-          onAddChild: () => addChildNode(id),
-          onStartConnection,
-          onNodeClick,
-          connectingSourceId: null
-        },
-        position: { x: 100, y: 100 },
-      };
-      setNodes([initialNode]);
-    }
-  }, []);
-
-  useEffect(() => {
     setNodes((nds) => nds.map(n => ({
       ...n,
       data: { ...n.data, connectingSourceId }
@@ -316,6 +356,15 @@ const BoltzCanvasInner = () => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-white gap-4">
+        <Loader2 className="animate-spin text-blue-600" size={48} />
+        <p className="text-gray-500 font-bold animate-pulse">Carregando seu mapa...</p>
+      </div>
+    );
+  }
+
   return (
     <div className={cn("w-full h-full bg-[#fcfcfc] relative overflow-hidden", connectingSourceId && "cursor-crosshair")}>
       <ReactFlow
@@ -328,12 +377,34 @@ const BoltzCanvasInner = () => {
         nodeTypes={nodeTypes}
         selectionOnDrag={true}
         selectionMode={SelectionMode.Partial}
-        panOnDrag={[1, 2]} // Permite pan com botão do meio ou dois dedos
+        panOnDrag={[1, 2]}
         fitView
         className="bg-transparent"
       >
         <Background color="#f1f1f1" gap={40} size={1} />
         
+        {/* Header do Editor */}
+        <Panel position="top-left" className="m-4 flex items-center gap-4 pointer-events-none">
+          <button 
+            onClick={onBack}
+            className="pointer-events-auto bg-white border border-gray-100 px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-blue-600 shadow-lg transition-all"
+          >
+            Voltar
+          </button>
+          <div className="pointer-events-auto bg-white border border-gray-100 px-4 py-2 rounded-xl shadow-lg flex items-center gap-3">
+            <span className="text-sm font-black text-gray-800">Editor</span>
+            <div className="w-px h-4 bg-gray-100" />
+            <button 
+              onClick={saveMap}
+              disabled={isSaving}
+              className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-700 disabled:opacity-50"
+            >
+              {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              {isSaving ? "Salvando..." : "Salvar Agora"}
+            </button>
+          </div>
+        </Panel>
+
         {/* Sidebar Direita */}
         <Panel position="top-right" className="h-[calc(100%-2rem)] flex items-center pointer-events-none">
           <div className={cn(
@@ -413,7 +484,7 @@ const BoltzCanvasInner = () => {
           </div>
         </Panel>
 
-        {/* Barra de Ferramentas Unificada (Canto Inferior Esquerdo) */}
+        {/* Barra de Ferramentas Unificada */}
         <Panel position="bottom-left" className="m-6">
           <div className="flex items-center gap-3 bg-white border border-gray-100 rounded-2xl p-1.5 shadow-2xl">
             <div className="flex items-center border-r border-gray-100 pr-1.5">
@@ -510,9 +581,9 @@ const BoltzCanvasInner = () => {
   );
 };
 
-const BoltzCanvas = () => (
+const BoltzCanvas = (props: BoltzCanvasProps) => (
   <ReactFlowProvider>
-    <BoltzCanvasInner />
+    <BoltzCanvasInner {...props} />
   </ReactFlowProvider>
 );
 

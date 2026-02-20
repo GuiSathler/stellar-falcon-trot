@@ -37,20 +37,22 @@ export const CreateWorkspaceModal = ({ isOpen, onClose, onCreate }: CreateWorksp
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
     try {
       await onCreate(name.trim(), selectedColor);
       setName('');
       onClose();
+    } catch (error) {
+      console.error("Erro no modal de criação:", error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
       <DialogContent className="sm:max-w-[425px] rounded-[32px] border-none shadow-2xl">
         <DialogHeader>
           <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 mb-4">
@@ -74,6 +76,7 @@ export const CreateWorkspaceModal = ({ isOpen, onClose, onCreate }: CreateWorksp
               onChange={(e) => setName(e.target.value)}
               className="h-12 rounded-2xl border-gray-100 bg-gray-50 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all"
               autoFocus
+              disabled={isSubmitting}
             />
           </div>
 
@@ -86,6 +89,7 @@ export const CreateWorkspaceModal = ({ isOpen, onClose, onCreate }: CreateWorksp
                 <button
                   key={color.value}
                   type="button"
+                  disabled={isSubmitting}
                   onClick={() => setSelectedColor(color.value)}
                   className={cn(
                     "w-8 h-8 rounded-full transition-all hover:scale-110 active:scale-90",
@@ -102,6 +106,7 @@ export const CreateWorkspaceModal = ({ isOpen, onClose, onCreate }: CreateWorksp
               type="button"
               variant="ghost"
               onClick={onClose}
+              disabled={isSubmitting}
               className="rounded-2xl font-bold text-gray-500 hover:bg-gray-50"
             >
               Cancelar
@@ -112,7 +117,7 @@ export const CreateWorkspaceModal = ({ isOpen, onClose, onCreate }: CreateWorksp
               className="rounded-2xl bg-blue-600 hover:bg-blue-700 font-bold px-8 shadow-lg shadow-blue-100"
             >
               {isSubmitting ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
-              Criar Workspace
+              {isSubmitting ? "Criando..." : "Criar Workspace"}
             </Button>
           </DialogFooter>
         </form>

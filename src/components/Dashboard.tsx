@@ -5,11 +5,9 @@ import {
   FileText, 
   Plus, 
   ChevronRight, 
-  Search, 
   Loader2, 
   FolderOpen, 
   PlusCircle,
-  ArrowRight,
   Layers,
   Share2
 } from 'lucide-react';
@@ -21,6 +19,7 @@ import { CreateWorkspaceModal } from './modals/CreateWorkspaceModal';
 import { ShareModal } from './modals/ShareModal';
 import { ShareResource } from '@/types/collaboration';
 import { v4 as uuidv4 } from 'uuid';
+import { useAuth } from './AuthProvider';
 
 interface DashboardProps {
   onSelectMap: (id: string) => void;
@@ -28,6 +27,7 @@ interface DashboardProps {
 }
 
 const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -38,11 +38,9 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
   const [shareResource, setShareResource] = useState<ShareResource | null>(null);
 
   const fetchData = async () => {
+    if (!user) return;
     setIsLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       const { data: wsData } = await supabase
         .from('workspaces')
         .select('*')
@@ -76,15 +74,12 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
 
   useEffect(() => {
     fetchData();
-  }, [workspaceId]);
+  }, [workspaceId, user]);
 
   const createNewMap = async () => {
-    if (isCreating) return;
+    if (isCreating || !user) return;
     setIsCreating(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       const rootNodeId = uuidv4();
       const initialContent = {
         nodes: [
@@ -112,18 +107,16 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
       setMaps([data, ...maps]);
       showSuccess("Mapa criado!");
       onSelectMap(data.id);
-    } catch (error) {
-      showError("Erro ao criar mapa.");
+    } catch (error: any) {
+      showError(error.message || "Erro ao criar mapa.");
     } finally {
       setIsCreating(false);
     }
   };
 
   const handleCreateWorkspace = async (name: string, color: string) => {
+    if (!user) return;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
-
       const { data, error } = await supabase
         .from('workspaces')
         .insert([{ name, user_id: user.id, color }])
@@ -133,11 +126,11 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
       
       setWorkspaces(prev => [...prev, data]);
       showSuccess("Workspace criado!");
-      // Disparar evento para atualizar a sidebar se necessário
       window.dispatchEvent(new CustomEvent('workspace-created', { detail: data }));
     } catch (error: any) {
       console.error("Erro ao criar workspace:", error);
       showError(error.message || "Erro ao criar workspace.");
+      throw error; // Repassa o erro para o modal fechar o loading
     }
   };
 

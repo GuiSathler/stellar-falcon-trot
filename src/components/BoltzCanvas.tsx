@@ -8,7 +8,6 @@ import {
   useNodesState,
   useEdgesState,
   addEdge,
-  Connection,
   Node,
   Panel,
   ReactFlowProvider,
@@ -27,22 +26,22 @@ import { showSuccess, showError } from '@/utils/toast';
 import { 
   Layout, 
   PlusCircle, 
-  Settings2, 
   Sparkles, 
   ChevronRight, 
   ChevronLeft,
   Download,
   Map as MapIcon,
-  Check,
-  X,
   Loader2,
-  MousePointer2
+  History,
+  RotateCcw,
+  Save
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMindMapHistory } from '@/hooks/useMindMapHistory';
 import { useMindMapPersistence } from '@/hooks/useMindMapPersistence';
 import { TopLeftPanel } from './canvas/TopLeftPanel';
 import { BottomLeftPanel } from './canvas/BottomLeftPanel';
+import { supabase } from '@/lib/supabase';
 
 const nodeTypes = { mindmap: MindMapNode };
 
@@ -56,38 +55,28 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
   const [edges, setEdges] = useEdgesState([]);
   const [isMenuOpen, setIsMenuOpen] = useState(true);
   const [isMiniMapOpen, setIsMiniMapOpen] = useState(true);
-  const [connectingSourceId, setConnectingSourceId] = useState<string | null>(null);
-  const [isCreatingRoot, setIsCreatingRoot] = useState(false);
-  const [newRootName, setNewRootName] = useState('');
+  const [isVersionsOpen, setIsVersionsOpen] = useState(false);
+  const [versions, setVersions] = useState<any[]>([]);
   
-  const { fitView, getEdges, getNodes } = useReactFlow();
+  const { fitView, getEdges, getNodes, setCenter, zoomTo } = useReactFlow();
   const { undo, redo, takeSnapshot, canUndo, canRedo } = useMindMapHistory();
   const { loadMap, saveMap, isLoading, isSaving } = useMindMapPersistence(mapId);
 
-  const onStartConnection = useCallback((id: string) => {
-    setConnectingSourceId(id);
-    showSuccess("Selecione o nó de destino");
-  }, []);
-
-  const handleNodeClick = useCallback((targetId: string) => {
-    setConnectingSourceId((currentSourceId) => {
-      if (currentSourceId && currentSourceId !== targetId) {
-        takeSnapshot(getNodes(), getEdges());
-        const newEdge = {
-          id: `e-${currentSourceId}-${targetId}`,
-          source: currentSourceId,
-          target: targetId,
-          type: 'smoothstep',
-          style: { stroke: '#3b82f6', strokeWidth: 2, strokeDasharray: '5,5' },
-          markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' },
-        };
-        setEdges((eds) => addEdge(newEdge, eds));
-        showSuccess("Conectado!");
-        return null;
+  // Atalhos de Teclado
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        handleUndo();
       }
-      return currentSourceId;
-    });
-  }, [setEdges, takeSnapshot, getNodes, getEdges]);
+      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [nodes, edges, past]);
 
   const addChildNode = useCallback((parentId: string) => {
     takeSnapshot(getNodes(), getEdges());
@@ -96,17 +85,27 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     setNodes((nds) => {
       const parentNode = nds.find((n) => n.id === parentId);
       if (!parentNode) return nds;
+
+      // Cálculo de posição sem sobreposição
+      const children = getEdges().filter(e => e.source === parentId);
+      const offset = children.length * 100 - (children.length * 50);
+      
       const newNode = {
         id: newNodeId,
         type: 'mindmap',
         data: { 
-          label: 'Novo Tópico', 
+          label: '', 
+          isNew: true,
           onAddChild: () => addChildNode(newNodeId),
-          onStartConnection: () => onStartConnection(newNodeId),
-          onNodeClick: (id: string) => handleNodeClick(id),
         },
-        position: { x: parentNode.position.x + 300, y: parentNode.position.y },
+        position: { x: parentNode.position.x + 350, y: parentNode.position.y + offset },
       };
+
+      // Focar no novo nó
+      setTimeout(() => {
+        setCenter(newNode.position.x + 100, newNode.position.y, { zoom: 1, duration: 800 });
+      }, 50);
+
       return [...nds, newNode];
     });
 
@@ -115,10 +114,10 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       source: parentId,
       target: newNodeId,
       type: 'smoothstep',
-      style: { stroke: '#cbd5e1', strokeWidth: 2 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: '#cbd5e1' },
+      style: { stroke: '#3b82f6', strokeWidth: 2 },
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' },
     }]);
-  }, [getEdges, setNodes, setEdges, onStartConnection, takeSnapshot, getNodes, handleNodeClick]);
+  }, [getEdges, setNodes, setEdges, takeSnapshot, setCenter]);
 
   const hydrateNodes = useCallback((nodesToHydrate: Node[]) => {
     return nodesToHydrate.map((node) => ({
@@ -126,11 +125,9 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       data: {
         ...node.data,
         onAddChild: () => addChildNode(node.id),
-        onStartConnection: () => onStartConnection(node.id),
-        onNodeClick: (id: string) => handleNodeClick(id),
       }
     }));
-  }, [addChildNode, onStartConnection, handleNodeClick]);
+  }, [addChildNode]);
 
   useEffect(() => {
     loadMap().then((content) => {
@@ -158,66 +155,63 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     }
   };
 
-  const confirmAddRootNode = () => {
-    if (!newRootName.trim()) return;
+  const addRootNode = () => {
     takeSnapshot(getNodes(), getEdges());
     const id = uuidv4();
     const newNode = {
       id,
       type: 'mindmap',
       data: { 
-        label: newRootName, 
+        label: '', 
+        isNew: true,
         onAddChild: () => addChildNode(id),
-        onStartConnection: () => onStartConnection(id),
-        onNodeClick: (id: string) => handleNodeClick(id),
       },
       position: { x: 100, y: 100 },
     };
     setNodes((nds) => [...nds, newNode]);
-    setNewRootName('');
-    setIsCreatingRoot(false);
-    showSuccess("Nó principal criado!");
+    setCenter(100, 100, { zoom: 1, duration: 800 });
   };
 
-  const autoLayout = () => {
-    takeSnapshot(getNodes(), getEdges());
-    const currentNodes = getNodes();
-    const currentEdges = getEdges();
+  const fetchVersions = async () => {
+    if (!mapId) return;
+    const { data } = await supabase
+      .from('map_versions')
+      .select('*')
+      .eq('map_id', mapId)
+      .order('created_at', { ascending: false });
+    setVersions(data || []);
+  };
+
+  const saveVersion = async () => {
+    if (!mapId) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    const content = { nodes: getNodes(), edges: getEdges() };
     
-    const newNodes = currentNodes.map((node) => {
-      const incomingEdges = currentEdges.filter(e => e.target === node.id);
-      if (incomingEdges.length === 0) return node; // Root node stays
-
-      const parent = currentNodes.find(n => n.id === incomingEdges[0].source);
-      if (!parent) return node;
-
-      const siblings = currentEdges.filter(e => e.source === parent.id);
-      const index = siblings.findIndex(e => e.target === node.id);
-      const offset = (index - (siblings.length - 1) / 2) * 120;
-
-      return {
-        ...node,
-        position: { x: parent.position.x + 300, y: parent.position.y + offset }
-      };
-    });
-
-    setNodes(newNodes);
-    showSuccess("Layout organizado!");
+    const { error } = await supabase
+      .from('map_versions')
+      .insert([{ map_id: mapId, content, user_id: user?.id }]);
+    
+    if (!error) {
+      showSuccess("Versão salva com sucesso!");
+      fetchVersions();
+    }
   };
 
-  const exportToJson = () => {
-    const data = { nodes: getNodes(), edges: getEdges() };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `mindmap-${mapId || 'export'}.json`;
-    link.click();
-    showSuccess("Exportação concluída!");
+  const restoreVersion = (version: any) => {
+    takeSnapshot(getNodes(), getEdges());
+    setNodes(hydrateNodes(version.content.nodes));
+    setEdges(version.content.edges);
+    showSuccess("Versão restaurada!");
+    setIsVersionsOpen(false);
   };
 
-  const onNodesChange: OnNodesChange = useCallback((changes) => setNodes((nds) => applyNodeChanges(changes, nds)), [setNodes]);
-  const onEdgesChange: OnEdgesChange = useCallback((changes) => setEdges((eds) => applyEdgeChanges(changes, eds)), [setEdges]);
+  const onNodesChange: OnNodesChange = useCallback((changes) => {
+    setNodes((nds) => applyNodeChanges(changes, nds));
+  }, [setNodes]);
+
+  const onEdgesChange: OnEdgesChange = useCallback((changes) => {
+    setEdges((eds) => applyEdgeChanges(changes, eds));
+  }, [setEdges]);
 
   if (isLoading) return (
     <div className="w-full h-full flex flex-col items-center justify-center bg-white gap-4">
@@ -227,32 +221,13 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
   );
 
   return (
-    <div className={cn("w-full h-full bg-[#fcfcfc] relative overflow-hidden", connectingSourceId && "cursor-crosshair")}>
-      {nodes.length === 0 && !isCreatingRoot && (
-        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-          <div className="bg-white/80 backdrop-blur-sm p-8 rounded-[40px] border-2 border-dashed border-blue-100 text-center animate-in zoom-in duration-500 pointer-events-auto">
-            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <MousePointer2 size={32} />
-            </div>
-            <h3 className="text-xl font-black text-gray-900 mb-2">Mapa Vazio</h3>
-            <p className="text-gray-500 text-sm mb-6 max-w-[240px]">Comece adicionando o tópico central do seu mapa mental.</p>
-            <button 
-              onClick={() => setIsCreatingRoot(true)}
-              className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 flex items-center gap-2 mx-auto"
-            >
-              <PlusCircle size={18} />
-              Criar Tópico Inicial
-            </button>
-          </div>
-        </div>
-      )}
-
+    <div className="w-full h-full bg-[#fcfcfc] relative overflow-hidden">
       <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onNodeDragStart={() => takeSnapshot(getNodes(), getEdges())}
+        onNodeDragStop={() => takeSnapshot(getNodes(), getEdges())}
         nodeTypes={nodeTypes}
         selectionOnDrag={true}
         selectionMode={SelectionMode.Partial}
@@ -261,7 +236,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       >
         <Background color="#f1f1f1" gap={40} size={1} />
         
-        <TopLeftPanel onBack={onBack} onSave={() => saveMap(getNodes(), getEdges())} isSaving={isSaving} />
+        <TopLeftPanel onBack={onBack} onSave={() => { saveMap(getNodes(), getEdges()); saveVersion(); }} isSaving={isSaving} />
 
         <Panel position="top-right" className="h-[calc(100%-2rem)] flex items-center pointer-events-none">
           <div className={cn("bg-white border border-gray-100 shadow-2xl rounded-2xl transition-all pointer-events-auto flex flex-col overflow-hidden", isMenuOpen ? "w-52 p-3" : "w-12 p-2")}>
@@ -269,33 +244,56 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
               {isMenuOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
             </button>
             <div className={cn("flex flex-col gap-1.5", !isMenuOpen && "items-center")}>
-              {isCreatingRoot && isMenuOpen ? (
-                <div className="p-2 bg-blue-50 rounded-xl border border-blue-100 mb-2 animate-in slide-in-from-top-2">
-                  <input 
-                    autoFocus
-                    className="w-full p-2 text-xs rounded-lg border border-blue-200 outline-none mb-2"
-                    placeholder="Nome do tópico..."
-                    value={newRootName}
-                    onChange={(e) => setNewRootName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && confirmAddRootNode()}
-                  />
-                  <div className="flex gap-1">
-                    <button onClick={confirmAddRootNode} className="flex-1 bg-blue-600 text-white p-1.5 rounded-lg flex justify-center"><Check size={14} /></button>
-                    <button onClick={() => setIsCreatingRoot(false)} className="flex-1 bg-white text-gray-400 p-1.5 rounded-lg border border-gray-200 flex justify-center"><X size={14} /></button>
-                  </div>
-                </div>
-              ) : (
-                <button onClick={() => setIsCreatingRoot(true)} className="flex items-center gap-2.5 p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-md mb-2">
-                  <PlusCircle size={18} />
-                  {isMenuOpen && <span className="text-xs font-bold">Novo Pai</span>}
-                </button>
-              )}
-              <button className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl"><Sparkles size={18} className="text-amber-400" />{isMenuOpen && <span className="text-xs font-medium">Sugerir IA</span>}</button>
-              <button onClick={autoLayout} className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl"><Layout size={18} className="text-indigo-400" />{isMenuOpen && <span className="text-xs font-medium">Organizar</span>}</button>
-              <button onClick={exportToJson} className="flex items-center gap-2.5 p-2 text-gray-500 hover:bg-gray-50 rounded-xl mt-auto"><Download size={18} />{isMenuOpen && <span className="text-xs font-medium">Exportar</span>}</button>
+              <button onClick={addRootNode} className="flex items-center gap-2.5 p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-md mb-2">
+                <PlusCircle size={18} />
+                {isMenuOpen && <span className="text-xs font-bold">Novo Tópico</span>}
+              </button>
+              
+              <button 
+                onClick={() => { setIsVersionsOpen(true); fetchVersions(); }}
+                className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl"
+              >
+                <History size={18} className="text-blue-400" />
+                {isMenuOpen && <span className="text-xs font-medium">Histórico</span>}
+              </button>
+
+              <button className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl">
+                <Sparkles size={18} className="text-amber-400" />
+                {isMenuOpen && <span className="text-xs font-medium">Sugerir IA</span>}
+              </button>
             </div>
           </div>
         </Panel>
+
+        {/* Painel de Versões */}
+        {isVersionsOpen && (
+          <div className="absolute inset-y-0 right-0 w-80 bg-white border-l border-gray-100 shadow-2xl z-[100] animate-in slide-in-from-right duration-300">
+            <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+              <h3 className="font-black text-gray-900">Histórico de Versões</h3>
+              <button onClick={() => setIsVersionsOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <ChevronRight size={20} />
+              </button>
+            </div>
+            <div className="p-4 space-y-3 overflow-y-auto h-[calc(100%-80px)]">
+              {versions.map((v) => (
+                <div key={v.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 group">
+                  <p className="text-xs font-bold text-gray-400 mb-1 uppercase tracking-widest">
+                    {new Date(v.created_at).toLocaleString()}
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-gray-700">Snapshot Automático</span>
+                    <button 
+                      onClick={() => restoreVersion(v)}
+                      className="p-2 bg-white text-blue-600 rounded-xl shadow-sm opacity-0 group-hover:opacity-100 transition-all hover:bg-blue-600 hover:text-white"
+                    >
+                      <RotateCcw size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <BottomLeftPanel onUndo={handleUndo} onRedo={handleRedo} canUndo={canUndo} canRedo={canRedo} />
 

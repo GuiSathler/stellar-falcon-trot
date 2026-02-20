@@ -1,164 +1,220 @@
 "use client";
 
-import React, { memo, useState } from 'react';
+import React, { memo, useState, useEffect, useRef } from 'react';
 import { Handle, Position, NodeProps, useReactFlow, Node } from '@xyflow/react';
-import { Plus, Trash2, Lightbulb, CheckCircle2, HelpCircle, AlertCircle, Link2 } from 'lucide-react';
+import { 
+  Plus, 
+  Trash2, 
+  Type, 
+  Palette, 
+  Type as FontIcon, 
+  ChevronDown,
+  Link2
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
-// Definindo a interface para os dados do nó para resolver erros de TS
 export type MindMapNodeData = {
   label: string;
   nodeType?: string;
   onAddChild?: () => void;
   onStartConnection?: (id: string) => void;
   onNodeClick?: (id: string) => void;
-  connectingSourceId?: string | null;
+  onDelete?: (id: string) => void;
+  isNew?: boolean;
+  style?: {
+    backgroundColor?: string;
+    color?: string;
+    fontSize?: number;
+    fontFamily?: string;
+    borderRadius?: number;
+  };
 };
 
-const NODE_TYPES = [
-  { id: 'idea', icon: Lightbulb, color: 'text-amber-500', label: 'Ideia' },
-  { id: 'task', icon: CheckCircle2, color: 'text-emerald-500', label: 'Tarefa' },
-  { id: 'question', icon: HelpCircle, color: 'text-blue-500', label: 'Dúvida' },
-  { id: 'alert', icon: AlertCircle, color: 'text-rose-500', label: 'Alerta' },
+const COLORS = [
+  { name: 'Branco', bg: 'bg-white', text: 'text-gray-800', hex: '#ffffff' },
+  { name: 'Azul', bg: 'bg-blue-500', text: 'text-white', hex: '#3b82f6' },
+  { name: 'Verde', bg: 'bg-emerald-500', text: 'text-white', hex: '#10b981' },
+  { name: 'Amarelo', bg: 'bg-amber-400', text: 'text-gray-900', hex: '#fbbf24' },
+  { name: 'Rosa', bg: 'bg-rose-500', text: 'text-white', hex: '#f43f5e' },
+  { name: 'Roxo', bg: 'bg-violet-500', text: 'text-white', hex: '#8b5cf6' },
+];
+
+const FONTS = [
+  { name: 'Inter', value: 'font-sans' },
+  { name: 'Serif', value: 'font-serif' },
+  { name: 'Mono', value: 'font-mono' },
 ];
 
 const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) => {
   const { setNodes } = useReactFlow();
-  const [isEditing, setIsEditing] = useState(false);
-  const [showTypePicker, setShowTypePicker] = useState(false);
+  const [isEditing, setIsEditing] = useState(data.isNew || false);
   const [label, setLabel] = useState(data.label);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const currentType = NODE_TYPES.find(t => t.id === data.nodeType) || NODE_TYPES[0];
-  const Icon = currentType.icon;
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.setSelectionRange(label.length, label.length);
+    }
+  }, [isEditing]);
 
   const handleBlur = () => {
     setIsEditing(false);
-    // Truncate label just in case, though maxLength should handle it
-    const sanitizedLabel = label.slice(0, 500);
+    if (!label.trim() && data.isNew) {
+      setNodes((nds) => nds.filter((n) => n.id !== id));
+      return;
+    }
+
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === id) {
-          return { ...node, data: { ...node.data, label: sanitizedLabel } };
+          return { 
+            ...node, 
+            data: { ...node.data, label: label.trim(), isNew: false } 
+          };
         }
         return node;
       })
     );
   };
 
-  const isConnectingSource = data.connectingSourceId === id;
+  const updateStyle = (newStyle: Partial<MindMapNodeData['style']>) => {
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id === id) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              style: { ...(node.data.style || {}), ...newStyle }
+            }
+          };
+        }
+        return node;
+      })
+    );
+  };
+
+  const nodeStyle = data.style || {};
 
   return (
     <div 
-      onClick={() => {
-        if (typeof data.onNodeClick === 'function') data.onNodeClick(id);
-      }}
       className={cn(
-        "group relative bg-white border transition-all duration-300 ease-out",
-        "rounded-xl px-3 py-2.5 min-w-[180px]",
-        selected 
-          ? "border-blue-500 shadow-xl ring-4 ring-blue-50" 
-          : "border-gray-200 shadow-sm hover:border-gray-300",
-        isConnectingSource && "ring-4 ring-blue-400 border-blue-500 animate-pulse"
+        "group relative transition-all duration-200 ease-out min-w-[180px] max-w-[350px]",
+        "rounded-xl border-2 shadow-sm",
+        selected ? "ring-4 ring-blue-100 border-blue-500" : "border-transparent",
+        nodeStyle.backgroundColor ? "" : "bg-white border-gray-200"
       )}
+      style={{ 
+        backgroundColor: nodeStyle.backgroundColor,
+        color: nodeStyle.color,
+        borderRadius: nodeStyle.borderRadius ? `${nodeStyle.borderRadius}px` : '12px'
+      }}
     >
-      {/* Handles invisíveis para manter a lógica de conexão do React Flow */}
-      <Handle type="target" position={Position.Left} className="opacity-0 !pointer-events-none" />
+      <Handle type="target" position={Position.Left} className="!bg-blue-400 !w-3 !h-3 !-left-1.5 border-2 border-white" />
       
-      <div className="flex items-center gap-2">
-        <button 
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowTypePicker(!showTypePicker);
-          }}
-          className={cn("p-1 rounded-md hover:bg-gray-50 transition-colors", currentType.color)}
-        >
-          <Icon size={14} />
-        </button>
-        
+      <div className="p-3">
         {isEditing ? (
-          <input
-            autoFocus
-            maxLength={500}
-            className="text-xs font-bold text-gray-800 outline-none w-full bg-transparent"
+          <textarea
+            ref={textareaRef}
+            className={cn(
+              "w-full bg-transparent outline-none resize-none overflow-hidden font-bold leading-tight",
+              nodeStyle.fontFamily || "font-sans"
+            )}
+            style={{ fontSize: nodeStyle.fontSize ? `${nodeStyle.fontSize}px` : '14px' }}
             value={label}
+            rows={label.split('\n').length || 1}
             onChange={(e) => setLabel(e.target.value)}
             onBlur={handleBlur}
-            onKeyDown={(e) => e.key === 'Enter' && handleBlur()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleBlur();
+              }
+            }}
           />
         ) : (
-          <span 
-            onDoubleClick={(e) => {
-              e.stopPropagation();
-              setIsEditing(true);
-            }}
-            className="text-xs font-bold text-gray-700 cursor-text truncate select-none flex-1"
+          <div 
+            onDoubleClick={() => setIsEditing(true)}
+            className={cn(
+              "whitespace-pre-wrap break-words font-bold cursor-text min-h-[1.5em] leading-tight",
+              nodeStyle.fontFamily || "font-sans"
+            )}
+            style={{ fontSize: nodeStyle.fontSize ? `${nodeStyle.fontSize}px` : '14px' }}
           >
-            {label}
-          </span>
+            {label || "Clique duplo para editar"}
+          </div>
         )}
       </div>
 
-      {showTypePicker && (
-        <div className="absolute -bottom-12 left-0 flex gap-1 bg-white p-1 rounded-lg shadow-xl border border-gray-100 z-[100] animate-in fade-in slide-in-from-top-1">
-          {NODE_TYPES.map((type) => (
-            <button
-              key={type.id}
-              onClick={(e) => {
-                e.stopPropagation();
-                setNodes((nds) => nds.map(n => n.id === id ? { ...n, data: { ...n.data, nodeType: type.id } } : n));
-                setShowTypePicker(false);
-              }}
-              className={cn("p-1.5 rounded hover:bg-gray-50 transition-colors", type.color)}
-            >
-              <type.icon size={14} />
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Ações Rápidas */}
+      {/* Toolbar de Personalização */}
       <div className={cn(
-        "absolute -right-2 -top-2 flex gap-1 transition-all duration-200",
-        selected || "opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100"
+        "absolute -bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-gray-100 p-1 rounded-xl shadow-xl z-50 transition-all",
+        selected ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"
       )}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="p-1.5 hover:bg-gray-50 rounded-lg text-gray-500"><Palette size={14} /></button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="grid grid-cols-3 gap-1 p-2">
+            {COLORS.map((c) => (
+              <button
+                key={c.hex}
+                onClick={() => updateStyle({ backgroundColor: c.hex, color: c.hex === '#ffffff' ? '#1f2937' : '#ffffff' })}
+                className={cn("w-6 h-6 rounded-full border border-gray-100", c.bg)}
+              />
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="p-1.5 hover:bg-gray-50 rounded-lg text-gray-500"><FontIcon size={14} /></button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            {FONTS.map((f) => (
+              <DropdownMenuItem key={f.value} onClick={() => updateStyle({ fontFamily: f.value })}>
+                <span className={f.value}>{f.name}</span>
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <div className="p-2 flex items-center gap-2">
+              <span className="text-[10px] font-bold text-gray-400">TAM</span>
+              <input 
+                type="range" min="10" max="32" 
+                value={nodeStyle.fontSize || 14}
+                onChange={(e) => updateStyle({ fontSize: parseInt(e.target.value) })}
+                className="w-20"
+              />
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <div className="w-px h-4 bg-gray-100 mx-1" />
+
         <button 
-          onClick={(e) => {
-            e.stopPropagation();
-            setNodes((nds) => nds.filter((n) => n.id !== id));
-          }}
-          className="p-1 bg-white border border-gray-100 rounded-md shadow-sm text-gray-400 hover:text-red-500"
-          title="Excluir"
+          onClick={() => data.onAddChild?.()}
+          className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
-          <Trash2 size={10} />
+          <Plus size={14} />
         </button>
         
         <button 
-          onClick={(e) => {
-            e.stopPropagation();
-            if (typeof data.onStartConnection === 'function') data.onStartConnection(id);
-          }}
-          className={cn(
-            "p-1 border rounded-md shadow-sm transition-colors",
-            isConnectingSource ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-400 hover:text-blue-600 border-gray-100"
-          )}
-          title="Conectar a outro nó"
+          onClick={() => setNodes((nds) => nds.filter(n => n.id !== id))}
+          className="p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg"
         >
-          <Link2 size={10} />
-        </button>
-
-        <button 
-          onClick={(e) => {
-            e.stopPropagation();
-            if (typeof data.onAddChild === 'function') data.onAddChild();
-          }}
-          className="p-1 bg-blue-600 rounded-md shadow-md text-white hover:bg-blue-700"
-          title="Adicionar Filho"
-        >
-          <Plus size={10} strokeWidth={3} />
+          <Trash2 size={14} />
         </button>
       </div>
 
-      <Handle type="source" position={Position.Right} className="opacity-0 !pointer-events-none" />
+      <Handle type="source" position={Position.Right} className="!bg-blue-400 !w-3 !h-3 !-right-1.5 border-2 border-white" />
     </div>
   );
 };

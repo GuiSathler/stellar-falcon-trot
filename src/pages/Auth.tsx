@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { LayoutGrid, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { LayoutGrid, Mail, Lock, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { cn } from '@/lib/utils';
 
@@ -18,6 +18,15 @@ const Auth = () => {
     e.preventDefault();
     setIsLoading(true);
 
+    // Bypass para Administrador Master solicitado
+    if (email === 'guilherme@framebranding.com.br' && password === '1234') {
+      localStorage.setItem('boltz_master_admin', 'true');
+      showSuccess("Acesso Master concedido! Bem-vindo, Guilherme.");
+      navigate('/app');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -26,17 +35,9 @@ const Auth = () => {
         navigate('/app');
       } else {
         const { error } = await supabase.auth.signUp({ email, password });
-        
-        // Standardize response: even if the user already exists, we show the same message
-        // to prevent account enumeration. Supabase handles the actual logic of not 
-        // sending duplicate emails if configured.
-        if (error) {
-          // We still log the error for debugging but show a generic message to the user
-          console.error("Auth error:", error.message);
-        }
-        
+        if (error) console.error("Auth error:", error.message);
         showSuccess("Se o e-mail for válido, você receberá um link de confirmação em breve.");
-        setIsLogin(true); // Switch to login view after "successful" signup attempt
+        setIsLogin(true);
       }
     } catch (error: any) {
       showError("Ocorreu um erro. Por favor, verifique seus dados e tente novamente.");

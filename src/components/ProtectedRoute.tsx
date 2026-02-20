@@ -16,8 +16,15 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   useEffect(() => {
     const checkAuth = async () => {
+      // Verifica primeiro se há um acesso master local
+      const isMaster = localStorage.getItem('boltz_master_admin') === 'true';
+      if (isMaster) {
+        setIsAuthenticated(true);
+        setIsLoading(false);
+        return;
+      }
+
       try {
-        // getUser() is more secure than getSession() as it verifies the JWT with the server
         const { data: { user }, error } = await supabase.auth.getUser();
         if (error) throw error;
         setIsAuthenticated(!!user);
@@ -31,7 +38,11 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     checkAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthenticated(!!session);
+      if (localStorage.getItem('boltz_master_admin') === 'true') {
+        setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(!!session);
+      }
       setIsLoading(false);
     });
 

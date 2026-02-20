@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { showSuccess } from '@/utils/toast';
+import { useNavigate } from 'react-router-dom';
 
 interface SidebarProps {
   activeView: string;
@@ -24,10 +25,13 @@ interface SidebarProps {
 
 const WorkspaceSidebar = ({ activeView, setActiveView }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
+    localStorage.removeItem('boltz_master_admin');
     await supabase.auth.signOut();
     showSuccess("Até logo!");
+    navigate('/auth');
   };
 
   const menuItems = [

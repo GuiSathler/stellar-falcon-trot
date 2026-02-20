@@ -4,55 +4,38 @@ import React, { memo, useState, useEffect, useRef } from 'react';
 import { Handle, Position, NodeProps, useReactFlow, Node } from '@xyflow/react';
 import { 
   Plus, 
-  Trash2, 
-  Palette, 
-  Type as FontIcon, 
+  CheckCircle2, 
+  GitBranch, 
+  MessageSquare, 
+  FileText, 
+  Image as ImageIcon, 
+  Paperclip, 
+  Smile, 
+  Link2, 
+  PaintBucket, 
+  Baseline, 
+  MoreHorizontal 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
 
 export type MindMapNodeData = {
   label: string;
-  nodeType?: string;
   onAddChild?: () => void;
-  onStartConnection?: (id: string) => void;
-  onNodeClick?: (id: string) => void;
-  onDelete?: (id: string) => void;
   isNew?: boolean;
   style?: {
     backgroundColor?: string;
+    borderColor?: string;
     color?: string;
     fontSize?: number;
-    fontFamily?: string;
-    borderRadius?: number;
   };
 };
-
-const COLORS = [
-  { name: 'Branco', bg: 'bg-white', text: 'text-gray-800', hex: '#ffffff' },
-  { name: 'Azul', bg: 'bg-blue-500', text: 'text-white', hex: '#3b82f6' },
-  { name: 'Verde', bg: 'bg-emerald-500', text: 'text-white', hex: '#10b981' },
-  { name: 'Amarelo', bg: 'bg-amber-400', text: 'text-gray-900', hex: '#fbbf24' },
-  { name: 'Rosa', bg: 'bg-rose-500', text: 'text-white', hex: '#f43f5e' },
-  { name: 'Roxo', bg: 'bg-violet-500', text: 'text-white', hex: '#8b5cf6' },
-];
-
-const FONTS = [
-  { name: 'Inter', value: 'font-sans' },
-  { name: 'Serif', value: 'font-serif' },
-  { name: 'Mono', value: 'font-mono' },
-];
 
 const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) => {
   const { setNodes } = useReactFlow();
   const [isEditing, setIsEditing] = useState(data.isNew || false);
   const [label, setLabel] = useState(data.label);
+  const [autoAlign, setAutoAlign] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -72,147 +55,104 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === id) {
-          const nodeData = node.data as MindMapNodeData;
           return { 
             ...node, 
-            data: { ...nodeData, label: label.trim(), isNew: false } 
+            data: { ...node.data, label: label.trim(), isNew: false } 
           };
         }
         return node;
       })
     );
   };
-
-  const updateStyle = (newStyle: Partial<NonNullable<MindMapNodeData['style']>>) => {
-    setNodes((nds) =>
-      nds.map((node) => {
-        if (node.id === id) {
-          const nodeData = node.data as MindMapNodeData;
-          return {
-            ...node,
-            data: {
-              ...nodeData,
-              style: { ...(nodeData.style || {}), ...newStyle }
-            }
-          };
-        }
-        return node;
-      })
-    );
-  };
-
-  const nodeStyle = data.style || {};
 
   return (
-    <div 
-      className={cn(
-        "group relative transition-all duration-200 ease-out min-w-[180px] max-w-[350px]",
-        "rounded-xl border-2 shadow-sm",
-        selected ? "ring-4 ring-blue-100 border-blue-500" : "border-transparent",
-        nodeStyle.backgroundColor ? "" : "bg-white border-gray-200"
-      )}
-      style={{ 
-        backgroundColor: nodeStyle.backgroundColor,
-        color: nodeStyle.color,
-        borderRadius: nodeStyle.borderRadius ? `${nodeStyle.borderRadius}px` : '12px'
-      }}
-    >
-      <Handle type="target" position={Position.Left} className="!bg-blue-400 !w-3 !h-3 !-left-1.5 border-2 border-white" />
-      
-      <div className="p-3">
-        {isEditing ? (
-          <textarea
-            ref={textareaRef}
-            className={cn(
-              "w-full bg-transparent outline-none resize-none overflow-hidden font-bold leading-tight",
-              nodeStyle.fontFamily || "font-sans"
-            )}
-            style={{ fontSize: nodeStyle.fontSize ? `${nodeStyle.fontSize}px` : '14px' }}
-            value={label}
-            rows={label.split('\n').length || 1}
-            onChange={(e) => setLabel(e.target.value)}
-            onBlur={handleBlur}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleBlur();
-              }
-            }}
-          />
-        ) : (
-          <div 
-            onDoubleClick={() => setIsEditing(true)}
-            className={cn(
-              "whitespace-pre-wrap break-words font-bold cursor-text min-h-[1.5em] leading-tight",
-              nodeStyle.fontFamily || "font-sans"
-            )}
-            style={{ fontSize: nodeStyle.fontSize ? `${nodeStyle.fontSize}px` : '14px' }}
-          >
-            {label || "Clique duplo para editar"}
+    <div className="relative group">
+      {/* Floating Toolbar */}
+      {selected && (
+        <div className="absolute -top-16 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-gray-100 px-3 py-2 rounded-xl shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-200 whitespace-nowrap">
+          <div className="flex items-center gap-3 pr-3 border-r border-gray-100">
+            <button className="text-gray-400 hover:text-blue-600 transition-colors"><CheckCircle2 size={18} /></button>
+            <button className="text-gray-400 hover:text-blue-600 transition-colors"><GitBranch size={18} /></button>
+            <button className="text-gray-400 hover:text-blue-600 transition-colors"><MessageSquare size={18} /></button>
+            <button className="text-gray-400 hover:text-blue-600 transition-colors"><FileText size={18} /></button>
+            <button className="text-gray-400 hover:text-blue-600 transition-colors"><ImageIcon size={18} /></button>
+            <button className="text-gray-400 hover:text-blue-600 transition-colors"><Paperclip size={18} /></button>
+            <button className="text-gray-400 hover:text-blue-600 transition-colors"><Smile size={18} /></button>
+            <button className="text-gray-400 hover:text-blue-600 transition-colors"><Link2 size={18} /></button>
           </div>
+
+          <div className="flex items-center gap-2 px-3 border-r border-gray-100">
+            <Switch 
+              checked={autoAlign} 
+              onCheckedChange={setAutoAlign}
+              className="data-[state=checked]:bg-blue-500 scale-75"
+            />
+            <span className="text-[11px] font-bold text-blue-300">Alinhamento automático</span>
+          </div>
+
+          <div className="flex items-center gap-3 pl-3">
+            <button className="text-gray-400 hover:text-blue-600 transition-colors"><PaintBucket size={18} /></button>
+            <button className="text-gray-400 hover:text-blue-600 transition-colors"><Baseline size={18} /></button>
+            <button className="text-gray-400 hover:text-blue-600 transition-colors"><MoreHorizontal size={18} /></button>
+          </div>
+        </div>
+      )}
+
+      {/* Node Body */}
+      <div 
+        className={cn(
+          "relative transition-all duration-200 min-w-[220px] max-w-[400px]",
+          "rounded-[28px] border-[3px] bg-white p-6 text-center shadow-sm",
+          selected ? "border-blue-500 ring-8 ring-blue-50" : "border-blue-400"
         )}
-      </div>
-
-      <div className={cn(
-        "absolute -bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-gray-100 p-1 rounded-xl shadow-xl z-50 transition-all",
-        selected ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"
-      )}>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="p-1.5 hover:bg-gray-50 rounded-lg text-gray-500"><Palette size={14} /></button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="grid grid-cols-3 gap-1 p-2">
-            {COLORS.map((c) => (
-              <button
-                key={c.hex}
-                onClick={() => updateStyle({ backgroundColor: c.hex, color: c.hex === '#ffffff' ? '#1f2937' : '#ffffff' })}
-                className={cn("w-6 h-6 rounded-full border border-gray-100", c.bg)}
-              />
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="p-1.5 hover:bg-gray-50 rounded-lg text-gray-500"><FontIcon size={14} /></button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            {FONTS.map((f) => (
-              <DropdownMenuItem key={f.value} onClick={() => updateStyle({ fontFamily: f.value })}>
-                <span className={f.value}>{f.name}</span>
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <div className="p-2 flex items-center gap-2">
-              <span className="text-[10px] font-bold text-gray-400">TAM</span>
-              <input 
-                type="range" min="10" max="32" 
-                value={nodeStyle.fontSize || 14}
-                onChange={(e) => updateStyle({ fontSize: parseInt(e.target.value) })}
-                className="w-20"
-              />
-            </div>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <div className="w-px h-4 bg-gray-100 mx-1" />
-
-        <button 
-          onClick={() => data.onAddChild?.()}
-          className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          <Plus size={14} />
-        </button>
+      >
+        <Handle type="target" position={Position.Left} className="opacity-0" />
         
-        <button 
-          onClick={() => setNodes((nds) => nds.filter(n => n.id !== id))}
-          className="p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg"
-        >
-          <Trash2 size={14} />
-        </button>
-      </div>
+        <div className="flex flex-col items-center justify-center min-h-[40px]">
+          {isEditing ? (
+            <textarea
+              ref={textareaRef}
+              className="w-full bg-transparent outline-none resize-none overflow-hidden font-black text-xl text-gray-700 text-center leading-tight"
+              value={label}
+              rows={label.split('\n').length || 1}
+              onChange={(e) => setLabel(e.target.value)}
+              onBlur={handleBlur}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleBlur();
+                }
+              }}
+            />
+          ) : (
+            <div 
+              onDoubleClick={() => setIsEditing(true)}
+              className="whitespace-pre-wrap break-words font-black text-xl text-gray-700 cursor-text leading-tight"
+            >
+              {label || "Novo Tópico"}
+            </div>
+          )}
+        </div>
 
-      <Handle type="source" position={Position.Right} className="!bg-blue-400 !w-3 !h-3 !-right-1.5 border-2 border-white" />
+        {/* Add Button (Right Side) */}
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            data.onAddChild?.();
+          }}
+          className={cn(
+            "absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-90 transition-all z-10",
+            !selected && "opacity-0 group-hover:opacity-100"
+          )}
+        >
+          <Plus size={20} strokeWidth={3} />
+        </button>
+
+        {/* Resize Handle (Bottom Right) */}
+        <div className="absolute bottom-2 right-4 w-2 h-2 border-2 border-blue-400 rounded-full bg-white" />
+
+        <Handle type="source" position={Position.Right} className="opacity-0" />
+      </div>
     </div>
   );
 };

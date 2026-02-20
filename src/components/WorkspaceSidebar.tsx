@@ -35,24 +35,30 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
   const [isModalOpen, setIsModalOpen] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('share_id')
-          .eq('id', user.id)
-          .single();
-        
+  const getUserProfile = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('share_id')
+        .eq('id', user.id)
+        .maybeSingle();
+      
+      if (profile?.share_id) {
         setUserData({ 
           email: user.email || '', 
-          shareId: profile?.share_id || '...' 
+          shareId: profile.share_id 
         });
-        fetchWorkspaces(user.id);
+      } else {
+        // Se o ID ainda não existe, tenta novamente em 2 segundos (esperando o trigger)
+        setTimeout(getUserProfile, 2000);
       }
-    };
-    getUser();
+      fetchWorkspaces(user.id);
+    }
+  };
+
+  useEffect(() => {
+    getUserProfile();
   }, []);
 
   const fetchWorkspaces = async (userId: string) => {
@@ -60,7 +66,6 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
       const { data, error } = await supabase
         .from('workspaces')
         .select('*')
-        .eq('user_id', userId)
         .order('created_at', { ascending: true });
       
       if (error) throw error;

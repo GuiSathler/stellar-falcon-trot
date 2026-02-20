@@ -23,7 +23,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import MindMapNode from './MindMapNode';
 import { v4 as uuidv4 } from 'uuid';
-import { showSuccess } from '@/utils/toast';
+import { showSuccess, showError } from '@/utils/toast';
 import { 
   Layout, 
   PlusCircle, 
@@ -179,6 +179,43 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     showSuccess("Nó principal criado!");
   };
 
+  const autoLayout = () => {
+    takeSnapshot(getNodes(), getEdges());
+    const currentNodes = getNodes();
+    const currentEdges = getEdges();
+    
+    const newNodes = currentNodes.map((node) => {
+      const incomingEdges = currentEdges.filter(e => e.target === node.id);
+      if (incomingEdges.length === 0) return node; // Root node stays
+
+      const parent = currentNodes.find(n => n.id === incomingEdges[0].source);
+      if (!parent) return node;
+
+      const siblings = currentEdges.filter(e => e.source === parent.id);
+      const index = siblings.findIndex(e => e.target === node.id);
+      const offset = (index - (siblings.length - 1) / 2) * 120;
+
+      return {
+        ...node,
+        position: { x: parent.position.x + 300, y: parent.position.y + offset }
+      };
+    });
+
+    setNodes(newNodes);
+    showSuccess("Layout organizado!");
+  };
+
+  const exportToJson = () => {
+    const data = { nodes: getNodes(), edges: getEdges() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `mindmap-${mapId || 'export'}.json`;
+    link.click();
+    showSuccess("Exportação concluída!");
+  };
+
   const onNodesChange: OnNodesChange = useCallback((changes) => setNodes((nds) => applyNodeChanges(changes, nds)), [setNodes]);
   const onEdgesChange: OnEdgesChange = useCallback((changes) => setEdges((eds) => applyEdgeChanges(changes, eds)), [setEdges]);
 
@@ -254,8 +291,8 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
                 </button>
               )}
               <button className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl"><Sparkles size={18} className="text-amber-400" />{isMenuOpen && <span className="text-xs font-medium">Sugerir IA</span>}</button>
-              <button className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl"><Layout size={18} className="text-indigo-400" />{isMenuOpen && <span className="text-xs font-medium">Organizar</span>}</button>
-              <button className="flex items-center gap-2.5 p-2 text-gray-500 hover:bg-gray-50 rounded-xl mt-auto"><Download size={18} />{isMenuOpen && <span className="text-xs font-medium">Exportar</span>}</button>
+              <button onClick={autoLayout} className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl"><Layout size={18} className="text-indigo-400" />{isMenuOpen && <span className="text-xs font-medium">Organizar</span>}</button>
+              <button onClick={exportToJson} className="flex items-center gap-2.5 p-2 text-gray-500 hover:bg-gray-50 rounded-xl mt-auto"><Download size={18} />{isMenuOpen && <span className="text-xs font-medium">Exportar</span>}</button>
             </div>
           </div>
         </Panel>

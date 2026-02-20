@@ -1,18 +1,27 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { User, Shield, Bell, CreditCard, Save, Loader2 } from 'lucide-react';
+import { User, Shield, Bell, CreditCard, Save, Loader2, Copy, Hash } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
 
 const Settings = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
+  const [shareId, setShareId] = useState('');
 
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) setEmail(user.email || '');
+      if (user) {
+        setEmail(user.email || '');
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('share_id')
+          .eq('id', user.id)
+          .single();
+        setShareId(profile?.share_id || '');
+      }
     };
     getUser();
   }, []);
@@ -23,6 +32,11 @@ const Settings = () => {
       setIsLoading(false);
       showSuccess("Configurações salvas localmente!");
     }, 1000);
+  };
+
+  const copyId = () => {
+    navigator.clipboard.writeText(shareId);
+    showSuccess("Boltz ID copiado!");
   };
 
   return (
@@ -57,15 +71,34 @@ const Settings = () => {
             <h3 className="text-xl font-bold text-gray-900 mb-6">Informações Pessoais</h3>
             
             <div className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700 ml-1">E-mail da Conta</label>
-                <input 
-                  type="email" 
-                  disabled
-                  value={email}
-                  className="w-full px-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm text-gray-400 cursor-not-allowed"
-                />
-                <p className="text-[10px] text-gray-400 ml-1">O e-mail não pode ser alterado no momento.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700 ml-1">E-mail da Conta</label>
+                  <input 
+                    type="email" 
+                    disabled
+                    value={email}
+                    className="w-full px-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm text-gray-400 cursor-not-allowed"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700 ml-1">Boltz ID (Chave de Acesso)</label>
+                  <div className="relative">
+                    <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400" size={16} />
+                    <input 
+                      type="text" 
+                      disabled
+                      value={shareId}
+                      className="w-full pl-10 pr-12 py-3.5 bg-blue-50/30 border border-blue-100 rounded-2xl text-sm font-black text-blue-600 cursor-default"
+                    />
+                    <button 
+                      onClick={copyId}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-600 transition-colors"
+                    >
+                      <Copy size={16} />
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-2">

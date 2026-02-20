@@ -11,6 +11,7 @@ import {
   User,
   Plus,
   Settings,
+  Copy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
@@ -29,7 +30,7 @@ interface SidebarProps {
 
 const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setActiveWorkspaceId }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userData, setUserData] = useState<{ email: string, shareId: string } | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const navigate = useNavigate();
@@ -38,7 +39,16 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        setUserEmail(user.email || null);
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('share_id')
+          .eq('id', user.id)
+          .single();
+        
+        setUserData({ 
+          email: user.email || '', 
+          shareId: profile?.share_id || '...' 
+        });
         fetchWorkspaces(user.id);
       }
     };
@@ -101,6 +111,13 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
     await supabase.auth.signOut();
     showSuccess("Até logo!");
     navigate('/auth');
+  };
+
+  const copyId = () => {
+    if (userData?.shareId) {
+      navigator.clipboard.writeText(userData.shareId);
+      showSuccess("Boltz ID copiado!");
+    }
   };
 
   return (
@@ -177,14 +194,17 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
         </div>
 
         <div className="mt-auto border-t p-2 space-y-1">
-          {!isCollapsed && userEmail && (
+          {!isCollapsed && userData && (
             <div className="px-3 py-2 mb-2 bg-blue-50/50 rounded-xl border border-blue-100/50 flex items-center gap-3">
               <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
                 <User size={16} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Usuário</p>
-                <p className="text-xs font-bold text-gray-700 truncate">{userEmail}</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Boltz ID</p>
+                  <button onClick={copyId} className="text-blue-400 hover:text-blue-600"><Copy size={10} /></button>
+                </div>
+                <p className="text-xs font-black text-gray-700 truncate">{userData.shareId}</p>
               </div>
             </div>
           )}

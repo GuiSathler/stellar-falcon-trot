@@ -5,11 +5,8 @@ import { Handle, Position, NodeProps, useReactFlow, Node } from '@xyflow/react';
 import { 
   Plus, 
   Trash2, 
-  Type, 
   Palette, 
   Type as FontIcon, 
-  ChevronDown,
-  Link2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -75,9 +72,10 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === id) {
+          const nodeData = node.data as MindMapNodeData;
           return { 
             ...node, 
-            data: { ...node.data, label: label.trim(), isNew: false } 
+            data: { ...nodeData, label: label.trim(), isNew: false } 
           };
         }
         return node;
@@ -85,15 +83,16 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
     );
   };
 
-  const updateStyle = (newStyle: Partial<MindMapNodeData['style']>) => {
+  const updateStyle = (newStyle: Partial<NonNullable<MindMapNodeData['style']>>) => {
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === id) {
+          const nodeData = node.data as MindMapNodeData;
           return {
             ...node,
             data: {
-              ...node.data,
-              style: { ...(node.data.style || {}), ...newStyle }
+              ...nodeData,
+              style: { ...(nodeData.style || {}), ...newStyle }
             }
           };
         }
@@ -154,7 +153,6 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
         )}
       </div>
 
-      {/* Toolbar de Personalização */}
       <div className={cn(
         "absolute -bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-gray-100 p-1 rounded-xl shadow-xl z-50 transition-all",
         selected ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"

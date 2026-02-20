@@ -7,7 +7,6 @@ import {
   Background,
   useNodesState,
   useEdgesState,
-  addEdge,
   Node,
   Panel,
   ReactFlowProvider,
@@ -20,21 +19,18 @@ import {
   SelectionMode,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import MindMapNode from './MindMapNode';
+import MindMapNode, { MindMapNodeData } from './MindMapNode';
 import { v4 as uuidv4 } from 'uuid';
 import { showSuccess, showError } from '@/utils/toast';
 import { 
-  Layout, 
   PlusCircle, 
   Sparkles, 
   ChevronRight, 
   ChevronLeft,
-  Download,
   Map as MapIcon,
   Loader2,
   History,
   RotateCcw,
-  Save
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMindMapHistory } from '@/hooks/useMindMapHistory';
@@ -58,7 +54,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
   const [isVersionsOpen, setIsVersionsOpen] = useState(false);
   const [versions, setVersions] = useState<any[]>([]);
   
-  const { fitView, getEdges, getNodes, setCenter, zoomTo } = useReactFlow();
+  const { fitView, getEdges, getNodes, setCenter } = useReactFlow();
   const { undo, redo, takeSnapshot, canUndo, canRedo } = useMindMapHistory();
   const { loadMap, saveMap, isLoading, isSaving } = useMindMapPersistence(mapId);
 
@@ -76,7 +72,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nodes, edges, past]);
+  }, [nodes, edges]); // Removido 'past' que não existia no escopo
 
   const addChildNode = useCallback((parentId: string) => {
     takeSnapshot(getNodes(), getEdges());
@@ -86,7 +82,6 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       const parentNode = nds.find((n) => n.id === parentId);
       if (!parentNode) return nds;
 
-      // Cálculo de posição sem sobreposição
       const children = getEdges().filter(e => e.source === parentId);
       const offset = children.length * 100 - (children.length * 50);
       
@@ -101,7 +96,6 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
         position: { x: parentNode.position.x + 350, y: parentNode.position.y + offset },
       };
 
-      // Focar no novo nó
       setTimeout(() => {
         setCenter(newNode.position.x + 100, newNode.position.y, { zoom: 1, duration: 800 });
       }, 50);
@@ -123,7 +117,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     return nodesToHydrate.map((node) => ({
       ...node,
       data: {
-        ...node.data,
+        ...(node.data as MindMapNodeData),
         onAddChild: () => addChildNode(node.id),
       }
     }));
@@ -265,7 +259,6 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
           </div>
         </Panel>
 
-        {/* Painel de Versões */}
         {isVersionsOpen && (
           <div className="absolute inset-y-0 right-0 w-80 bg-white border-l border-gray-100 shadow-2xl z-[100] animate-in slide-in-from-right duration-300">
             <div className="p-6 border-b border-gray-50 flex items-center justify-between">

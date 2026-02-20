@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { FileText, Plus, ChevronRight, Search, Loader2, Crown, Briefcase } from 'lucide-react';
+import { FileText, Plus, ChevronRight, Search, Loader2, Crown, Briefcase, FolderOpen } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ActionMenu } from './ActionMenu';
+import { Workspace } from '@/types/mindmap';
 
 interface DashboardProps {
   onSelectMap: (id: string) => void;
@@ -17,12 +18,17 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [maps, setMaps] = useState<any[]>([]);
-  const [workspaceName, setWorkspaceName] = useState<string | null>(null);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null);
   const { profile } = usePermissions();
 
-  const fetchMaps = async () => {
+  const fetchData = async () => {
     setIsLoading(true);
     try {
+      // Buscar todos os workspaces para o menu de mover
+      const { data: wsData } = await supabase.from('workspaces').select('*');
+      if (wsData) setWorkspaces(wsData);
+
       let query = supabase
         .from('maps')
         .select('*')
@@ -30,43 +36,37 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
 
       if (workspaceId) {
         query = query.eq('workspace_id', workspaceId);
-        
-        // Buscar nome do workspace
-        const { data: wsData } = await supabase
-          .from('workspaces')
-          .select('name')
-          .eq('id', workspaceId)
-          .single();
-        if (wsData) setWorkspaceName(wsData.name);
+        const currentWs = wsData?.find(w => w.id === workspaceId);
+        setActiveWorkspace(currentWs || null);
       } else {
-        setWorkspaceName(null);
+        setActiveWorkspace(null);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       setMaps(data || []);
     } catch (error: any) {
-      console.error("Erro ao buscar mapas:", error);
+      console.error("Erro ao buscar dados:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchMaps();
+    fetchData();
   }, [workspaceId]);
 
   const createNewMap = async () => {
     if (isCreating) return;
     
     if (profile?.plan_type === 'free' && maps.length >= 3) {
-      return showError("Limite de 3 mapas atingido no plano Free. Faça upgrade!");
+      return showError("Limite de 3 mapas atingido no plano Free.");
     }
 
     setIsCreating(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return showError("Você precisa estar logado.");
+      if (!user) return;
 
       const { data, error } = await supabase
         .from('maps')
@@ -94,33 +94,46 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
   };
 
   const handleDeleteMap = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este mapa?")) return;
-
+    if (!confirm("Excluir este mapa?")) return;
     try {
       const { error } = await supabase.from('maps').delete().eq('id', id);
       if (error) throw error;
       setMaps(maps.filter(m => m.id !== id));
       showSuccess("Mapa excluído.");
     } catch (error: any) {
-      showError("Erro ao excluir mapa.");
+      showError("Erro ao excluir.");
     }
   };
 
   const handleRenameMap = async (id: string, currentTitle: string) => {
-    const newTitle = prompt("Novo título do mapa:", currentTitle);
+    const newTitle = prompt("Novo título:", currentTitle);
     if (!newTitle || newTitle === currentTitle) return;
+    try {
+      const { error } = await supabase.from('maps').update({ title: newTitle }).eq('id', id);
+      if (error) throw error;
+      setMaps(maps.map(m => m.id === id ? { ...m, title: newTitle } : m));
+      showSuccess("Renomeado!");
+    } catch (error) {
+      showError("Erro ao renomear.");
+    }
+  };
 
+  const handleMoveMap = async (mapId: string, targetWorkspaceId: string) => {
     try {
       const { error } = await supabase
         .from('maps')
-        .update({ title: newTitle })
-        .eq('id', id);
+        .update({ workspace_id: targetWorkspaceId || null })
+        .eq('id', mapId);
       
       if (error) throw error;
-      setMaps(maps.map(m => m.id === id ? { ...m, title: newTitle } : m));
-      showSuccess("Mapa renomeado!");
+      
+      // Se estivermos em um workspace específico, removemos o mapa da lista local
+      if (workspaceId) {
+        setMaps(maps.filter(m => m.id !== mapId));
+      }
+      showSuccess("Mapa movido com sucesso!");
     } catch (error) {
-      showError("Erro ao renomear.");
+      showError("Erro ao mover mapa.");
     }
   };
 
@@ -133,15 +146,19 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-6">
         <div>
           <div className="flex items-center gap-2 text-sm text-gray-400 mb-2">
-            <span>Workspace</span>
+            <FolderOpen size={14} />
+            <span>Workspaces</span>
             <ChevronRight size={14} />
             <span className="text-gray-900 font-semibold">
-              {workspaceName || "Todos os Projetos"}
+              {activeWorkspace?.name || "Todos os Projetos"}
             </span>
           </div>
           <h1 className="text-4xl font-black text-gray-900 tracking-tight flex items-center gap-3">
-            {workspaceName ? (
-              <><Briefcase className="text-blue-600" size={32} /> {workspaceName}</>
+            {activeWorkspace ? (
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg" style={{ backgroundColor: activeWorkspace.color }} />
+                {activeWorkspace.name}
+              </div>
             ) : "Meus Mapas"}
             {profile?.plan_type === 'pro' && (
               <span className="bg-amber-100 text-amber-600 text-xs px-3 py-1 rounded-full flex items-center gap-1">
@@ -156,7 +173,7 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input 
               type="text" 
-              placeholder="Pesquisar..." 
+              placeholder="Pesquisar mapas..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none w-full md:w-64 focus:ring-2 focus:ring-blue-100 transition-all"
@@ -180,8 +197,8 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
       ) : filteredMaps.length === 0 ? (
         <div className="text-center py-20 bg-gray-50 rounded-[40px] border-2 border-dashed border-gray-200">
           <FileText className="mx-auto text-gray-300 mb-4" size={48} />
-          <h3 className="text-lg font-bold text-gray-900">Nenhum mapa encontrado</h3>
-          <p className="text-gray-500">Comece criando seu primeiro mapa mental!</p>
+          <h3 className="text-lg font-bold text-gray-900">Nenhum mapa aqui</h3>
+          <p className="text-gray-500">Crie um novo mapa para começar a organizar suas ideias.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -198,6 +215,8 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
                 <ActionMenu 
                   onDelete={() => handleDeleteMap(map.id)} 
                   onRename={() => handleRenameMap(map.id, map.title)}
+                  onMove={(wsId) => handleMoveMap(map.id, wsId)}
+                  workspaces={workspaces.filter(w => w.id !== map.workspace_id)}
                   label="Mapa" 
                 />
               </div>

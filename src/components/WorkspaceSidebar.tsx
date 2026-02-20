@@ -20,6 +20,8 @@ import { useNavigate } from 'react-router-dom';
 import { Workspace } from '@/types/mindmap';
 import { ActionMenu } from './ActionMenu';
 
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+
 interface SidebarProps {
   activeView: string;
   setActiveView: (view: string) => void;
@@ -63,23 +65,24 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
     const name = prompt("Nome do novo Workspace:");
     if (!name || name.trim() === "") return;
 
+    const randomColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
       const { data, error } = await supabase
         .from('workspaces')
-        .insert([{ name: name.trim(), user_id: user.id }])
+        .insert([{ name: name.trim(), user_id: user.id, color: randomColor }])
         .select()
         .single();
 
       if (error) throw error;
 
       setWorkspaces(prev => [...prev, data]);
-      showSuccess("Workspace criado com sucesso!");
+      showSuccess("Workspace criado!");
     } catch (error: any) {
-      console.error("Erro detalhado ao criar workspace:", error);
-      showError(`Erro: ${error.message || "Verifique se a tabela 'workspaces' existe no Supabase"}`);
+      showError(`Erro: ${error.message}`);
     }
   };
 
@@ -142,13 +145,7 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
         <div className="mt-4 mb-2 px-3 flex items-center justify-between">
           {!isCollapsed && <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Workspaces</span>}
           {!isCollapsed && (
-            <button 
-              onClick={(e) => {
-                e.preventDefault();
-                handleCreateWorkspace();
-              }} 
-              className="p-1 hover:bg-gray-200 rounded text-gray-500 transition-colors"
-            >
+            <button onClick={handleCreateWorkspace} className="p-1 hover:bg-gray-200 rounded text-gray-500 transition-colors">
               <Plus size={14} />
             </button>
           )}
@@ -167,7 +164,10 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
                 isCollapsed && "justify-center px-0"
               )}
             >
-              <Briefcase size={18} />
+              <div 
+                className="w-2 h-2 rounded-full shrink-0" 
+                style={{ backgroundColor: ws.color || '#3b82f6' }} 
+              />
               {!isCollapsed && <span className="truncate flex-1">{ws.name}</span>}
             </button>
             {!isCollapsed && (

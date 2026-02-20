@@ -12,5 +12,6 @@ export interface Workspace {
   id: string;
   name: string;
   user_id: string;
+  color?: string;
   created_at: string;
 }

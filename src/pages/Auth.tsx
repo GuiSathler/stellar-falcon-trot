@@ -26,12 +26,20 @@ const Auth = () => {
         navigate('/app');
       } else {
         const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        showSuccess("Conta criada! Verifique seu e-mail.");
+        
+        // Standardize response: even if the user already exists, we show the same message
+        // to prevent account enumeration. Supabase handles the actual logic of not 
+        // sending duplicate emails if configured.
+        if (error) {
+          // We still log the error for debugging but show a generic message to the user
+          console.error("Auth error:", error.message);
+        }
+        
+        showSuccess("Se o e-mail for válido, você receberá um link de confirmação em breve.");
+        setIsLogin(true); // Switch to login view after "successful" signup attempt
       }
     } catch (error: any) {
-      // Use a generic error message to prevent account enumeration
-      showError("E-mail ou senha inválidos. Por favor, verifique seus dados e tente novamente.");
+      showError("Ocorreu um erro. Por favor, verifique seus dados e tente novamente.");
     } finally {
       setIsLoading(false);
     }

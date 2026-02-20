@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { LayoutGrid, Mail, Lock, ArrowRight, Loader2, Phone, AlertTriangle } from 'lucide-react';
+import { LayoutGrid, Mail, Lock, ArrowRight, Loader2, Phone, AlertTriangle, Check } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
+import { cn } from '@/lib/utils';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -13,7 +14,17 @@ const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
+
+  // Carregar e-mail salvo se existir
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('boltz_remembered_email');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +42,13 @@ const Auth = () => {
 
     try {
       if (isLogin) {
-        // Strictly use Supabase Auth - no hardcoded credentials allowed
+        // Salvar ou remover e-mail do localStorage baseado no "Lembrar de mim"
+        if (rememberMe) {
+          localStorage.setItem('boltz_remembered_email', email);
+        } else {
+          localStorage.removeItem('boltz_remembered_email');
+        }
+
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         showSuccess("Bem-vindo de volta!");
@@ -134,6 +151,27 @@ const Auth = () => {
               />
             </div>
           </div>
+
+          {isLogin && (
+            <div className="flex items-center justify-between px-1">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <div className={cn(
+                  "w-5 h-5 rounded-md border transition-all flex items-center justify-center",
+                  rememberMe ? "bg-blue-600 border-blue-600" : "bg-gray-50 border-gray-200 group-hover:border-blue-300"
+                )}>
+                  <input 
+                    type="checkbox" 
+                    className="hidden" 
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  {rememberMe && <Check className="text-white" size={14} strokeWidth={4} />}
+                </div>
+                <span className="text-xs font-bold text-gray-500 group-hover:text-gray-700 transition-colors">Lembrar de mim</span>
+              </label>
+              <button type="button" className="text-xs font-bold text-blue-600 hover:underline">Esqueceu a senha?</button>
+            </div>
+          )}
 
           <button 
             type="submit"

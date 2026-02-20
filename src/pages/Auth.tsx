@@ -9,6 +9,7 @@ import { showError, showSuccess } from '@/utils/toast';
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [attemptedAuth, setAttemptedAuth] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
@@ -16,6 +17,7 @@ const Auth = () => {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAttemptedAuth(true);
     
     if (!isSupabaseConfigured) {
       showError("Configuração do Supabase ausente. Conecte o projeto primeiro.");
@@ -62,10 +64,10 @@ const Auth = () => {
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-6">
       <div className="w-full max-w-md space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        {!isSupabaseConfigured && (
-          <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-start gap-3 text-amber-800 text-sm font-medium mb-6">
+        {attemptedAuth && !isSupabaseConfigured && (
+          <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-start gap-3 text-amber-800 text-sm font-medium mb-6 animate-in fade-in zoom-in duration-300">
             <AlertTriangle className="shrink-0 text-amber-500" size={20} />
-            <p>O Supabase não está conectado. Clique no botão de integração para configurar as chaves.</p>
+            <p>O Supabase não está conectado. Clique no botão de integração para configurar as chaves e depois use o botão Rebuild.</p>
           </div>
         )}
 
@@ -131,7 +133,7 @@ const Auth = () => {
 
           <button 
             type="submit"
-            disabled={isLoading || !isSupabaseConfigured}
+            disabled={isLoading}
             className="w-full bg-blue-600 text-white py-4 rounded-2xl text-sm font-bold hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-xl shadow-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? <Loader2 className="animate-spin" size={20} /> : (
@@ -145,7 +147,10 @@ const Auth = () => {
 
         <div className="text-center">
           <button 
-            onClick={() => setIsLogin(!isLogin)}
+            onClick={() => {
+              setIsLogin(!isLogin);
+              setAttemptedAuth(false);
+            }}
             className="text-sm font-bold text-gray-500 hover:text-blue-600 transition-colors"
           >
             {isLogin ? "Não tem uma conta? Cadastre-se" : "Já tem uma conta? Entre aqui"}

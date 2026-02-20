@@ -1,9 +1,10 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Panel, useReactFlow, useStore } from '@xyflow/react';
-import { Undo2, Redo2, Minus, Plus, Target } from 'lucide-react';
+import { Undo2, Redo2, Minus, Plus, Target, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ShortcutsPlaybook } from '../modals/ShortcutsPlaybook';
 
 interface BottomLeftPanelProps {
   onUndo: () => void;
@@ -15,6 +16,7 @@ interface BottomLeftPanelProps {
 export const BottomLeftPanel = ({ onUndo, onRedo, canUndo, canRedo }: BottomLeftPanelProps) => {
   const { zoomIn, zoomOut, fitView, getViewport, setViewport } = useReactFlow();
   const zoom = useStore((s) => s.transform[2]);
+  const [isPlaybookOpen, setIsPlaybookOpen] = useState(false);
 
   const handleManualZoom = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -28,7 +30,7 @@ export const BottomLeftPanel = ({ onUndo, onRedo, canUndo, canRedo }: BottomLeft
   };
 
   return (
-    <Panel position="bottom-left" className="m-6">
+    <Panel position="bottom-left" className="m-6 flex items-center gap-3">
       <div className="flex items-center gap-3 bg-white border border-gray-100 rounded-2xl p-1.5 shadow-2xl">
         <div className="flex items-center border-r border-gray-100 pr-1.5">
           <button 
@@ -72,6 +74,15 @@ export const BottomLeftPanel = ({ onUndo, onRedo, canUndo, canRedo }: BottomLeft
           <button onClick={() => fitView({ duration: 800 })} className="p-2 text-gray-500 hover:bg-gray-50 rounded-xl"><Target size={18} /></button>
         </div>
       </div>
+
+      <button 
+        onClick={() => setIsPlaybookOpen(true)}
+        className="w-11 h-11 bg-white border border-gray-100 rounded-2xl shadow-2xl flex items-center justify-center text-gray-400 hover:text-blue-600 hover:scale-105 active:scale-95 transition-all"
+      >
+        <HelpCircle size={20} />
+      </button>
+
+      <ShortcutsPlaybook isOpen={isPlaybookOpen} onClose={() => setIsPlaybookOpen(false)} />
     </Panel>
   );
 };

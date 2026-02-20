@@ -2,15 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { UserProfile, PermissionAction, UserRole } from '@/types/auth';
+import { UserProfile, PermissionAction } from '@/types/auth';
+import { useAuth } from '@/components/AuthProvider';
 
 export function usePermissions() {
+  const { user, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadProfile() {
-      const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data } = await supabase
           .from('profiles')
@@ -18,11 +19,16 @@ export function usePermissions() {
           .eq('id', user.id)
           .single();
         setProfile(data);
+      } else {
+        setProfile(null);
       }
       setLoading(false);
     }
-    loadProfile();
-  }, []);
+    
+    if (!authLoading) {
+      loadProfile();
+    }
+  }, [user, authLoading]);
 
   const hasPermission = (action: PermissionAction, mapOwnerId?: string): boolean => {
     if (!profile) return false;
@@ -45,5 +51,5 @@ export function usePermissions() {
     }
   };
 
-  return { profile, hasPermission, loading };
+  return { profile, hasPermission, loading: loading || authLoading };
 }

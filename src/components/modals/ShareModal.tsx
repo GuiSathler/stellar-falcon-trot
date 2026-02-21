@@ -32,7 +32,7 @@ interface ShareModalProps {
 export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<CollaborationRole>('viewer');
-  const [members, setMembers] = useState<Member[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInviting, setIsInviting] = useState(false);
 
@@ -44,7 +44,13 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
 
       const { data, error } = await supabase
         .from(table)
-        .select(`id, user_id, role, created_at`)
+        .select(`
+          id, 
+          user_id, 
+          role, 
+          created_at,
+          profiles:user_id (email)
+        `)
         .eq(foreignKey, resource.id);
 
       if (error) throw error;
@@ -67,7 +73,6 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
 
     setIsInviting(true);
     try {
-      // Busca o usuário pelo e-mail na tabela de perfis
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('id, email')
@@ -77,13 +82,12 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
       if (profileError) throw profileError;
 
       if (!profileData) {
-        throw new Error("Usuário não encontrado. O colaborador precisa ter uma conta ativa no Boltz Flow para ser convidado.");
+        throw new Error("Usuário não encontrado. O colaborador precisa ter uma conta ativa no Boltz Flow.");
       }
 
       const table = resource.type === 'workspace' ? 'workspace_members' : 'map_members';
       const foreignKey = resource.type === 'workspace' ? 'workspace_id' : 'map_id';
 
-      // Verifica se já é membro
       const isAlreadyMember = members.some(m => m.user_id === profileData.id);
       if (isAlreadyMember) {
         throw new Error("Este usuário já tem acesso a este recurso.");
@@ -180,8 +184,10 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
                       <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center text-blue-600 shadow-sm">
                         <Shield size={14} />
                       </div>
-                      <div>
-                        <p className="text-xs font-bold text-gray-700">ID: {member.user_id.slice(0, 8)}...</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-gray-700 truncate">
+                          {member.profiles?.email || `ID: ${member.user_id.slice(0, 8)}...`}
+                        </p>
                         <p className="text-[10px] font-black uppercase text-blue-400 tracking-wider">{member.role}</p>
                       </div>
                     </div>

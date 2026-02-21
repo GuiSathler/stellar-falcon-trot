@@ -25,7 +25,7 @@ const Landing = () => {
             <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
               <LayoutGrid className="text-white" size={22} />
             </div>
-            <span className="text-xl font-black tracking-tight">Boltz Flow</span>
+            <span className="text-xl font-black tracking-tight">Boltz Map</span>
           </div>
           
           <div className="hidden md:flex items-center gap-8 text-sm font-bold text-gray-500">
@@ -133,11 +133,11 @@ const Landing = () => {
             <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
               <LayoutGrid className="text-white" size={16} />
             </div>
-            <span className="text-lg font-black tracking-tight">Boltz Flow</span>
+            <span className="text-lg font-black tracking-tight">Boltz Map</span>
           </div>
           
           <p className="text-sm font-medium text-gray-400">
-            © 2024 Boltz Flow. Todos os direitos reservados.
+            © 2024 Boltz Map. Todos os direitos reservados.
           </p>
           
           <div className="flex items-center gap-6">

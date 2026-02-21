@@ -122,11 +122,11 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
             )}
           >
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shrink-0 shadow-sm">
-              <span className="text-white font-black text-xs">BF</span>
+              <span className="text-white font-black text-xs">BM</span>
             </div>
             {!isCollapsed && (
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-black text-gray-900 truncate uppercase tracking-tight">Boltz Flow</p>
+                <p className="text-xs font-black text-gray-900 truncate uppercase tracking-tight">Boltz Map</p>
                 <p className="text-[10px] font-bold text-gray-400 truncate">Workspace Pessoal</p>
               </div>
             )}

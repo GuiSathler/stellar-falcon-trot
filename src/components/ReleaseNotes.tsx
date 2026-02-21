@@ -42,7 +42,7 @@ const ReleaseNotes = () => {
         </div>
         <div>
           <h2 className="text-3xl font-black text-gray-900 tracking-tight">O que há de novo?</h2>
-          <p className="text-gray-500 font-medium">Evoluindo o Boltz Flow a cada commit.</p>
+          <p className="text-gray-500 font-medium">Evoluindo o Boltz Map a cada commit.</p>
         </div>
       </div>
 

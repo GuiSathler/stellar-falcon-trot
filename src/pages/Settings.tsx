@@ -29,7 +29,7 @@ const Settings = () => {
     <div className="p-10 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="mb-12">
         <h1 className="text-4xl font-black text-gray-900 tracking-tight mb-2">Configurações</h1>
-        <p className="text-gray-500 font-medium">Gerencie sua conta e preferências do Boltz Flow.</p>
+        <p className="text-gray-500 font-medium">Gerencie sua conta e preferências do Boltz Map.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

@@ -17,7 +17,6 @@ const Auth = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
 
-  // Carregar e-mail salvo se existir
   useEffect(() => {
     const savedEmail = localStorage.getItem('boltz_remembered_email');
     if (savedEmail) {
@@ -30,7 +29,6 @@ const Auth = () => {
     e.preventDefault();
     setAttemptedAuth(true);
     
-    // Security: Ensure no legacy bypass keys are set in LocalStorage
     localStorage.removeItem('boltz_master_admin');
 
     if (!isSupabaseConfigured) {
@@ -42,7 +40,6 @@ const Auth = () => {
 
     try {
       if (isLogin) {
-        // Salvar ou remover e-mail do localStorage baseado no "Lembrar de mim"
         if (rememberMe) {
           localStorage.setItem('boltz_remembered_email', email);
         } else {
@@ -100,7 +97,7 @@ const Auth = () => {
             {isLogin ? "Acesse sua conta" : "Crie sua conta"}
           </h1>
           <p className="text-gray-500 mt-2 font-medium">
-            {isLogin ? "Continue seus projetos no Boltz Flow" : "Comece a organizar suas ideias hoje"}
+            {isLogin ? "Continue seus projetos no Boltz Map" : "Comece a organizar suas ideias hoje"}
           </p>
         </div>
 

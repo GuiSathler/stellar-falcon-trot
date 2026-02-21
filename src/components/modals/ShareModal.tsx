@@ -82,7 +82,7 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
       if (profileError) throw profileError;
 
       if (!profileData) {
-        throw new Error("Usuário não encontrado. O colaborador precisa ter uma conta ativa no Boltz Flow.");
+        throw new Error("Usuário não encontrado. O colaborador precisa ter uma conta ativa no Boltz Map.");
       }
 
       const table = resource.type === 'workspace' ? 'workspace_members' : 'map_members';
@@ -134,7 +134,7 @@ export const ShareModal = ({ isOpen, onClose, resource }: ShareModalProps) => {
           </div>
           <DialogTitle className="text-2xl font-black tracking-tight">Compartilhar {resource.name}</DialogTitle>
           <DialogDescription className="text-gray-500 font-medium">
-            Convide colaboradores pelo e-mail cadastrado no Boltz Flow.
+            Convide colaboradores pelo e-mail cadastrado no Boltz Map.
           </DialogDescription>
         </DialogHeader>
 

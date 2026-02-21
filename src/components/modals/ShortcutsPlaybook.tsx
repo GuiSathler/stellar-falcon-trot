@@ -58,7 +58,7 @@ export const ShortcutsPlaybook = ({ isOpen, onClose }: ShortcutsPlaybookProps) =
           </div>
           <DialogTitle className="text-2xl font-black tracking-tight">Playbook de Atalhos</DialogTitle>
           <DialogDescription className="text-gray-500 font-medium">
-            Domine o Boltz Flow com comandos rápidos de teclado.
+            Domine o Boltz Map com comandos rápidos de teclado.
           </DialogDescription>
         </DialogHeader>
 

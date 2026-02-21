@@ -54,8 +54,8 @@ const Index = () => {
         setActiveWorkspaceId={setActiveWorkspaceId}
       />
 
-      <main className="flex-1 flex flex-col relative overflow-y-auto bg-white">
-        <div className="flex-1 relative">
+      <main className="flex-1 flex flex-col relative overflow-hidden bg-white">
+        <div className="flex-1 relative overflow-hidden">
           {renderContent()}
         </div>
       </main>

@@ -11,6 +11,10 @@ import {
   User,
   Plus,
   Settings,
+  Search,
+  Clock,
+  Star,
+  ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
@@ -103,44 +107,80 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
     navigate('/auth');
   };
 
+  const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId);
+
   return (
     <>
       <div className={cn(
-        "border-r bg-gray-50/50 h-screen flex flex-col transition-all duration-300 relative",
+        "border-r bg-[#f9f9f9] h-screen flex flex-col transition-all duration-300 relative z-40",
         isCollapsed ? "w-16" : "w-64"
       )}>
-        <button 
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -right-3 top-10 bg-white border border-gray-200 rounded-full p-1 shadow-sm hover:bg-gray-50 z-50"
-        >
-          {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-        </button>
-
-        <div className={cn("flex items-center gap-2 p-4 mb-4", isCollapsed && "justify-center")}>
-          <div className="min-w-[32px] h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <LayoutGrid className="text-white" size={18} />
-          </div>
-          {!isCollapsed && <h1 className="font-bold text-lg tracking-tight truncate">Boltz Flow</h1>}
+        {/* Workspace Switcher */}
+        <div className="p-3">
+          <button 
+            className={cn(
+              "w-full flex items-center gap-2 p-2 rounded-xl hover:bg-gray-200/50 transition-all text-left",
+              isCollapsed && "justify-center"
+            )}
+          >
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shrink-0 shadow-sm">
+              <span className="text-white font-black text-xs">BF</span>
+            </div>
+            {!isCollapsed && (
+              <>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-black text-gray-900 truncate uppercase tracking-tight">Boltz Flow</p>
+                  <p className="text-[10px] font-bold text-gray-400 truncate">Free Plan</p>
+                </div>
+                <ChevronDown size={14} className="text-gray-400" />
+              </>
+            )}
+          </button>
         </div>
 
-        <div className="flex flex-col gap-1 px-2 overflow-y-auto flex-1">
-          <button 
+        {/* Search Bar */}
+        {!isCollapsed && (
+          <div className="px-4 mb-4">
+            <div className="relative group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={14} />
+              <input 
+                type="text" 
+                placeholder="Pesquisar por título..."
+                className="w-full pl-9 pr-3 py-2 bg-gray-200/50 border-transparent rounded-lg text-xs font-medium focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Main Navigation */}
+        <div className="flex flex-col gap-0.5 px-2 flex-1 overflow-y-auto">
+          <NavItem 
+            icon={Home} 
+            label="Início" 
+            active={activeView === 'dashboard' && !activeWorkspaceId} 
+            collapsed={isCollapsed}
             onClick={() => {
               setActiveView('dashboard');
               setActiveWorkspaceId(undefined);
             }}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md transition-all text-sm font-medium",
-              activeView === 'dashboard' && !activeWorkspaceId ? "bg-white text-blue-600 shadow-sm border border-gray-200" : "text-gray-600 hover:bg-gray-100",
-              isCollapsed && "justify-center px-0"
-            )}
-          >
-            <Home size={18} />
-            {!isCollapsed && <span>Início</span>}
-          </button>
+          />
+          <NavItem 
+            icon={Clock} 
+            label="Recente" 
+            active={false} 
+            collapsed={isCollapsed}
+            onClick={() => {}}
+          />
+          <NavItem 
+            icon={Star} 
+            label="Favorito" 
+            active={false} 
+            collapsed={isCollapsed}
+            onClick={() => {}}
+          />
 
-          <div className="mt-4 mb-2 px-3 flex items-center justify-between">
-            {!isCollapsed && <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Workspaces</span>}
+          <div className="mt-6 mb-2 px-3 flex items-center justify-between">
+            {!isCollapsed && <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Espaços</span>}
             {!isCollapsed && (
               <button onClick={() => setIsModalOpen(true)} className="p-1 hover:bg-gray-200 rounded text-gray-500 transition-colors">
                 <Plus size={14} />
@@ -156,8 +196,8 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
                   setActiveView('dashboard');
                 }}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md transition-all text-sm font-medium w-full text-left",
-                  activeWorkspaceId === ws.id ? "bg-white text-blue-600 shadow-sm border border-gray-200" : "text-gray-600 hover:bg-gray-100",
+                  "flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-sm font-medium w-full text-left",
+                  activeWorkspaceId === ws.id ? "bg-white text-blue-600 shadow-sm border border-gray-200" : "text-gray-600 hover:bg-gray-200/50",
                   isCollapsed && "justify-center px-0"
                 )}
               >
@@ -176,54 +216,45 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
           ))}
         </div>
 
-        <div className="mt-auto border-t p-2 space-y-1">
-          {!isCollapsed && userEmail && (
-            <div className="px-3 py-2 mb-2 bg-blue-50/50 rounded-xl border border-blue-100/50 flex items-center gap-3">
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
-                <User size={16} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Usuário</p>
-                <p className="text-xs font-bold text-gray-700 truncate">{userEmail}</p>
-              </div>
-            </div>
-          )}
-
-          <button 
+        {/* Footer Actions */}
+        <div className="mt-auto border-t border-gray-200 p-2 space-y-1">
+          <NavItem 
+            icon={Sparkles} 
+            label="Novidades" 
+            active={activeView === 'updates'} 
+            collapsed={isCollapsed}
             onClick={() => setActiveView('updates')}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md transition-all text-sm font-medium w-full",
-              activeView === 'updates' ? "bg-blue-50 text-blue-600" : "text-gray-600 hover:bg-gray-100",
-              isCollapsed && "justify-center px-0"
-            )}
-          >
-            <Sparkles size={18} className={activeView === 'updates' ? "text-blue-600" : "text-amber-500"} />
-            {!isCollapsed && <span>Novidades</span>}
-          </button>
-          
-          <button 
+            iconColor="text-amber-500"
+          />
+          <NavItem 
+            icon={Settings} 
+            label="Configurações" 
+            active={activeView === 'settings'} 
+            collapsed={isCollapsed}
             onClick={() => setActiveView('settings')}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md transition-all text-sm font-medium w-full",
-              activeView === 'settings' ? "bg-blue-50 text-blue-600" : "text-gray-600 hover:bg-gray-100",
-              isCollapsed && "justify-center px-0"
-            )}
-          >
-            <Settings size={18} />
-            {!isCollapsed && <span>Configurações</span>}
-          </button>
-
-          <button 
-            onClick={handleLogout}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md transition-all text-sm font-medium text-red-500 hover:bg-red-50 w-full",
-              isCollapsed && "justify-center px-0"
-            )}
-          >
-            <LogOut size={18} />
-            {!isCollapsed && <span>Sair</span>}
-          </button>
+          />
+          
+          <div className="pt-2">
+            <button 
+              onClick={handleLogout}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-sm font-medium text-red-500 hover:bg-red-50 w-full",
+                isCollapsed && "justify-center px-0"
+              )}
+            >
+              <LogOut size={18} />
+              {!isCollapsed && <span>Sair</span>}
+            </button>
+          </div>
         </div>
+
+        {/* Collapse Toggle */}
+        <button 
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="absolute -right-3 top-1/2 -translate-y-1/2 bg-white border border-gray-200 rounded-full p-1 shadow-md hover:bg-gray-50 z-50 transition-transform hover:scale-110"
+        >
+          {isCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
+        </button>
       </div>
 
       <CreateWorkspaceModal 
@@ -234,5 +265,19 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
     </>
   );
 };
+
+const NavItem = ({ icon: Icon, label, active, collapsed, onClick, iconColor }: any) => (
+  <button 
+    onClick={onClick}
+    className={cn(
+      "flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-sm font-medium w-full",
+      active ? "bg-white text-blue-600 shadow-sm border border-gray-200" : "text-gray-600 hover:bg-gray-200/50",
+      collapsed && "justify-center px-0"
+    )}
+  >
+    <Icon size={18} className={iconColor} />
+    {!collapsed && <span>{label}</span>}
+  </button>
+);
 
 export default WorkspaceSidebar;

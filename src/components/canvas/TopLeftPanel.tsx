@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Panel } from '@xyflow/react';
-import { Save, Loader2, CloudCheck, Cloud } from 'lucide-react';
+import { Save, Loader2, Cloud, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface TopLeftPanelProps {
@@ -34,7 +34,10 @@ export const TopLeftPanel = ({ onBack, onSave, isSaving }: TopLeftPanelProps) =>
             </>
           ) : (
             <>
-              <CloudCheck size={10} />
+              <div className="flex items-center -space-x-1">
+                <Cloud size={10} />
+                <Check size={8} strokeWidth={4} />
+              </div>
               <span>Salvo</span>
             </>
           )}

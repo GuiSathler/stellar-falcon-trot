@@ -11,10 +11,19 @@ interface PermissionGateProps {
   fallback?: React.ReactNode;
 }
 
+/**
+ * PermissionGate
+ * 
+ * Componente utilitário para renderização condicional baseada em permissões.
+ * Lembre-se: Se o usuário burlar isso via console, o RLS do banco de dados 
+ * ainda bloqueará a requisição maliciosa.
+ */
 export const PermissionGate = ({ action, mapOwnerId, children, fallback = null }: PermissionGateProps) => {
   const { hasPermission, loading } = usePermissions();
 
   if (loading) return null;
+  
+  // Se não tiver permissão na UI, renderiza o fallback (ou nada)
   if (!hasPermission(action, mapOwnerId)) return <>{fallback}</>;
 
   return <>{children}</>;

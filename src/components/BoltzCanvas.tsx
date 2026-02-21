@@ -64,46 +64,53 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     saveMap(getNodes(), getEdges());
   }, [saveMap, getNodes, getEdges]);
 
-  const autoLayout = useCallback(() => {
-    if (!confirm("Isso reorganizará todo o seu mapa. Deseja continuar? Você pode desfazer se não gostar.")) return;
+  // NOVA LÓGICA: Organiza apenas o ramo selecionado
+  const organizeBranch = useCallback(() => {
+    const selectedNode = getNodes().find(n => n.selected);
     
+    if (!selectedNode) {
+      showError("Selecione um tópico para organizar seus sub-tópicos.");
+      return;
+    }
+
     takeSnapshot(getNodes(), getEdges());
     
     setNodes((nds) => {
       const currentEdges = getEdges();
-      const root = nds.find(n => !currentEdges.some(e => e.target === n.id));
-      if (!root) return nds;
-
       const newNodes = [...nds];
-      const horizontalSpacing = 300;
-      const verticalSpacing = 120;
+      const horizontalSpacing = 280;
+      const verticalSpacing = 100;
 
+      // Função recursiva para encontrar e posicionar apenas descendentes
       const layout = (parentId: string, x: number, y: number) => {
         const children = currentEdges.filter(e => e.source === parentId).map(e => e.target);
-        const nodeIdx = newNodes.findIndex(n => n.id === parentId);
-        if (nodeIdx !== -1) {
-          newNodes[nodeIdx] = { ...newNodes[nodeIdx], position: { x, y } };
-        }
+        if (children.length === 0) return;
 
         const totalHeight = (children.length - 1) * verticalSpacing;
         let currentY = y - totalHeight / 2;
 
         children.forEach(childId => {
-          layout(childId, x + horizontalSpacing, currentY);
+          const nodeIdx = newNodes.findIndex(n => n.id === childId);
+          if (nodeIdx !== -1) {
+            newNodes[nodeIdx] = { 
+              ...newNodes[nodeIdx], 
+              position: { x: x + horizontalSpacing, y: currentY } 
+            };
+            layout(childId, x + horizontalSpacing, currentY);
+          }
           currentY += verticalSpacing;
         });
       };
 
-      layout(root.id, root.position.x, root.position.y);
+      layout(selectedNode.id, selectedNode.position.x, selectedNode.position.y);
       return newNodes;
     });
 
     setTimeout(() => {
-      fitView({ duration: 800 });
       triggerSave();
-      showSuccess("Mapa organizado! Use Ctrl+Z para desfazer.");
+      showSuccess("Ramo organizado!");
     }, 100);
-  }, [getEdges, getNodes, setNodes, takeSnapshot, fitView, triggerSave]);
+  }, [getEdges, getNodes, setNodes, takeSnapshot, triggerSave]);
 
   const addChildNode = useCallback((parentId: string) => {
     takeSnapshot(getNodes(), getEdges());
@@ -310,7 +317,6 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
         
         <TopLeftPanel onBack={onBack} onSave={triggerSave} isSaving={isSaving} />
 
-        {/* Menu Lateral Direito Refatorado */}
         <Panel position="top-right" className="h-[calc(100%-3rem)] flex items-center pointer-events-none m-6">
           <div className={cn(
             "bg-white border border-gray-100 shadow-2xl rounded-[32px] transition-all duration-500 pointer-events-auto flex flex-col overflow-hidden",
@@ -342,8 +348,8 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
 
               <ToolButton 
                 icon={LayoutTemplate} 
-                label="Auto-Alinhar" 
-                onClick={autoLayout} 
+                label="Organizar Ramo" 
+                onClick={organizeBranch} 
                 isOpen={isRightPanelOpen} 
                 color="text-blue-500"
               />

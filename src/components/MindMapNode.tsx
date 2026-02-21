@@ -59,20 +59,23 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
     <div className="relative group">
       <div 
         className={cn(
-          "relative transition-all duration-300 min-w-[160px] max-w-[300px]",
-          "rounded-2xl border-2 bg-white p-4 text-center shadow-sm",
-          selected ? "border-blue-500 ring-4 ring-blue-50 scale-105" : "border-gray-200 hover:border-blue-300"
+          "relative transition-all duration-500 min-w-[180px] max-w-[320px]",
+          "rounded-[28px] border-4 bg-white p-6 text-center shadow-2xl",
+          selected 
+            ? "border-[#29A858] ring-[12px] ring-[#29A858]/10 scale-110 z-50" 
+            : "border-[#110935]/5 hover:border-[#29A858]/30"
         )}
-        style={{ borderColor: data.color || undefined }}
+        style={{ borderColor: selected ? undefined : data.color }}
       >
         <Handle type="target" position={Position.Left} className="opacity-0" />
         
-        <div className="flex flex-col items-center justify-center min-h-[24px]">
+        <div className="flex flex-col items-center justify-center min-h-[32px]">
           {isEditing ? (
             <textarea
               ref={textareaRef}
-              className="w-full bg-transparent outline-none resize-none overflow-hidden font-bold text-sm text-gray-800 text-center leading-tight"
+              className="w-full bg-transparent outline-none resize-none overflow-hidden font-black text-lg text-[#110935] text-center leading-tight placeholder:text-[#110935]/20"
               value={label}
+              placeholder="Type something..."
               rows={label.split('\n').length || 1}
               onChange={(e) => setLabel(e.target.value)}
               onBlur={handleBlur}
@@ -86,9 +89,9 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
           ) : (
             <div 
               onDoubleClick={() => setIsEditing(true)}
-              className="whitespace-pre-wrap break-words font-bold text-sm text-gray-800 cursor-text leading-tight"
+              className="whitespace-pre-wrap break-words font-black text-lg text-[#110935] cursor-text leading-tight tracking-tight"
             >
-              {label || "Tópico"}
+              {label || "New Topic"}
             </div>
           )}
         </div>
@@ -99,11 +102,11 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
             data.onAddChild?.();
           }}
           className={cn(
-            "absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-90 transition-all z-10",
+            "absolute -right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-[#29A858] text-[#110935] rounded-2xl flex items-center justify-center shadow-xl hover:scale-110 active:scale-90 transition-all z-10 border-4 border-white",
             !selected && "opacity-0 group-hover:opacity-100"
           )}
         >
-          <Plus size={14} strokeWidth={3} />
+          <Plus size={20} strokeWidth={4} />
         </button>
 
         <Handle type="source" position={Position.Right} className="opacity-0" />

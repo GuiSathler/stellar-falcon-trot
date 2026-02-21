@@ -9,7 +9,8 @@ import {
   Zap, 
   Shield, 
   MousePointer2,
-  Github
+  Github,
+  Circle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -17,23 +18,23 @@ const Landing = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 selection:bg-blue-100 selection:text-blue-700 overflow-x-hidden">
+    <div className="min-h-screen bg-[#110935] text-white selection:bg-[#79F791] selection:text-[#110935] overflow-x-hidden">
       {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
-              <LayoutGrid className="text-white" size={22} />
+      <nav className="fixed top-0 w-full z-50 bg-[#110935]/80 backdrop-blur-xl border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-6 h-24 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-[#29A858] rounded-2xl flex items-center justify-center shadow-lg shadow-[#29A858]/20">
+              <LayoutGrid className="text-[#110935]" size={24} strokeWidth={3} />
             </div>
-            <span className="text-xl font-black tracking-tight">Boltz Map</span>
+            <span className="text-2xl font-black tracking-tighter">boltz.</span>
           </div>
           
-          <div className="hidden md:flex items-center gap-8 text-sm font-bold text-gray-500">
-            <a href="#features" className="hover:text-blue-600 transition-colors">Recursos</a>
-            <a href="#about" className="hover:text-blue-600 transition-colors">Sobre</a>
+          <div className="hidden md:flex items-center gap-10 text-sm font-bold">
+            <a href="#features" className="hover:text-[#79F791] transition-colors">Recursos</a>
+            <a href="#about" className="hover:text-[#79F791] transition-colors">Sobre</a>
             <button 
               onClick={() => navigate('/app')}
-              className="bg-gray-900 text-white px-6 py-2.5 rounded-full hover:bg-blue-600 transition-all active:scale-95"
+              className="bg-[#29A858] text-[#110935] px-8 py-3.5 rounded-full hover:bg-[#79F791] transition-all active:scale-95 font-black"
             >
               Entrar no App
             </button>
@@ -42,107 +43,114 @@ const Landing = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-40 pb-20 px-6">
-        <div className="max-w-5xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 text-blue-600 text-xs font-black uppercase tracking-widest mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <section className="pt-52 pb-32 px-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-[#79F791] text-xs font-black uppercase tracking-widest mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <Sparkles size={14} />
-            O futuro dos mapas mentais chegou
+            O futuro dos mapas mentais
           </div>
           
-          <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9] mb-8 animate-in fade-in slide-in-from-bottom-6 duration-1000">
-            Transforme ideias em <span className="text-blue-600">fluxos visuais</span>.
+          <h1 className="text-7xl md:text-[140px] font-black tracking-tighter leading-[0.85] mb-12 animate-in fade-in slide-in-from-bottom-6 duration-1000">
+            Better <br />
+            <span className="relative inline-block">
+              Business
+              <svg className="absolute -bottom-2 left-0 w-full h-4 text-[#79F791] opacity-60" viewBox="0 0 100 10" preserveAspectRatio="none">
+                <path d="M0 5 Q 25 0, 50 5 T 100 5" fill="none" stroke="currentColor" strokeWidth="4" />
+              </svg>
+            </span> <br />
+            <span className="text-[#29A858]">Mapping.</span>
           </h1>
           
-          <p className="text-xl text-gray-500 font-medium max-w-2xl mx-auto mb-12 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
-            A ferramenta definitiva para organizar pensamentos, planejar projetos e colaborar em tempo real com uma interface intuitiva e poderosa.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300">
-            <button 
-              onClick={() => navigate('/app')}
-              className="group bg-blue-600 text-white px-10 py-5 rounded-2xl text-lg font-bold hover:bg-blue-700 hover:scale-105 active:scale-95 transition-all flex items-center gap-3 shadow-2xl shadow-blue-200"
-            >
-              Começar Agora Grátis
-              <ArrowRight className="group-hover:translate-x-1 transition-transform" />
-            </button>
-            <button className="px-10 py-5 rounded-2xl text-lg font-bold text-gray-600 hover:bg-gray-50 transition-all">
-              Ver Demonstração
-            </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-end">
+            <p className="text-2xl text-white/60 font-medium leading-tight max-w-md animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
+              At Boltz we live and breathe responsibility and care. Organize your ideas with professional precision.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row items-center gap-6 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300">
+              <button 
+                onClick={() => navigate('/app')}
+                className="group bg-[#29A858] text-[#110935] px-12 py-6 rounded-2xl text-xl font-black hover:bg-[#79F791] hover:scale-105 active:scale-95 transition-all flex items-center gap-4 shadow-2xl shadow-[#29A858]/20"
+              >
+                getboltz.com
+                <ArrowRight className="group-hover:translate-x-1 transition-transform" strokeWidth={3} />
+              </button>
+              <button className="text-lg font-bold text-white/40 hover:text-white transition-all">
+                Ver Demonstração
+              </button>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Preview Image / Mockup */}
-      <section className="px-6 pb-32">
-        <div className="max-w-6xl mx-auto relative">
-          <div className="absolute -inset-4 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-[40px] blur-3xl opacity-10 animate-pulse" />
-          <div className="relative bg-white border border-gray-100 rounded-[32px] shadow-2xl overflow-hidden aspect-video group">
-            <div className="absolute inset-0 bg-gray-50 flex items-center justify-center">
-              <div className="flex flex-col items-center gap-4 text-gray-300">
-                <LayoutGrid size={80} strokeWidth={1} />
-                <span className="font-bold uppercase tracking-widest text-sm">Visualização do Workspace</span>
+      {/* Preview Section */}
+      <section className="px-6 pb-40">
+        <div className="max-w-7xl mx-auto relative">
+          <div className="absolute -inset-10 bg-[#29A858] rounded-[60px] blur-[120px] opacity-10 animate-pulse" />
+          <div className="relative bg-[#1a1a4e] border border-white/10 rounded-[48px] shadow-2xl overflow-hidden aspect-video group">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#29A858]/10 to-transparent" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-6 text-white/10">
+                <LayoutGrid size={120} strokeWidth={0.5} />
+                <span className="font-black uppercase tracking-[0.3em] text-sm">Visual Workspace</span>
               </div>
             </div>
-            {/* Overlay Gradient */}
-            <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent opacity-60" />
           </div>
         </div>
       </section>
 
-      {/* Features Grid */}
-      <section id="features" className="py-32 bg-gray-50/50">
+      {/* Features */}
+      <section id="features" className="py-40 bg-white text-[#110935]">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-            <div className="space-y-6">
-              <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center">
-                <Zap size={28} />
-              </div>
-              <h3 className="text-2xl font-bold">Velocidade Boltz</h3>
-              <p className="text-gray-500 font-medium leading-relaxed">
-                Crie nós e conexões instantaneamente com atalhos inteligentes e uma engine de renderização ultra-rápida.
-              </p>
-            </div>
-            
-            <div className="space-y-6">
-              <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center">
-                <MousePointer2 size={28} />
-              </div>
-              <h3 className="text-2xl font-bold">Interatividade Total</h3>
-              <p className="text-gray-500 font-medium leading-relaxed">
-                Seleção por área estilo desktop, drag-and-drop fluido e organização automática com um clique.
-              </p>
-            </div>
-            
-            <div className="space-y-6">
-              <div className="w-14 h-14 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center">
-                <Shield size={28} />
-              </div>
-              <h3 className="text-2xl font-bold">Segurança & Backup</h3>
-              <p className="text-gray-500 font-medium leading-relaxed">
-                Seus dados são salvos localmente e podem ser exportados em JSON a qualquer momento para total controle.
-              </p>
-            </div>
+          <div className="mb-32 max-w-3xl">
+            <h2 className="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9] mb-12">
+              Designed for <br />
+              <span className="scribble-circle inline-block px-4">Modern</span> Teams.
+            </h2>
+            <p className="text-2xl text-[#110935]/60 font-medium">
+              We are a business that is sustainable not only for us, but for all of society and our environment.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-20">
+            <FeatureCard 
+              icon={Zap} 
+              title="Ingenuity" 
+              desc="Crie fluxos complexos com a simplicidade de um clique. Nossa engine é otimizada para performance extrema."
+              color="bg-[#79F791]"
+            />
+            <FeatureCard 
+              icon={Shield} 
+              title="Trust" 
+              desc="Seus dados são criptografados e protegidos. Privacidade não é um recurso, é o nosso fundamento."
+              color="bg-[#AC7FFF]"
+            />
+            <FeatureCard 
+              icon={MousePointer2} 
+              title="Simplicity" 
+              desc="Interface limpa, sem distrações. Focamos no que importa: a clareza das suas ideias."
+              color="bg-[#E6E7E8]"
+            />
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-20 border-t border-gray-100">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-8">
-          <div className="flex items-center gap-2.5 opacity-50 grayscale">
-            <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
-              <LayoutGrid className="text-white" size={16} />
+      <footer className="py-32 border-t border-white/5">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-12">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
+              <LayoutGrid className="text-white" size={20} strokeWidth={3} />
             </div>
-            <span className="text-lg font-black tracking-tight">Boltz Map</span>
+            <span className="text-xl font-black tracking-tighter">boltz.</span>
           </div>
           
-          <p className="text-sm font-medium text-gray-400">
-            © 2024 Boltz Map. Todos os direitos reservados.
+          <p className="text-sm font-bold text-white/20">
+            © 2024 Boltz Map. All rights reserved.
           </p>
           
-          <div className="flex items-center gap-6">
-            <a href="#" className="text-gray-400 hover:text-gray-900 transition-colors">
-              <Github size={20} />
+          <div className="flex items-center gap-8">
+            <a href="#" className="text-white/20 hover:text-[#79F791] transition-colors">
+              <Github size={24} />
             </a>
           </div>
         </div>
@@ -150,5 +158,17 @@ const Landing = () => {
     </div>
   );
 };
+
+const FeatureCard = ({ icon: Icon, title, desc, color }: any) => (
+  <div className="space-y-8 group">
+    <div className={cn("w-20 h-20 rounded-[32px] flex items-center justify-center transition-transform group-hover:scale-110 duration-500", color)}>
+      <Icon size={32} className="text-[#110935]" strokeWidth={2.5} />
+    </div>
+    <div className="space-y-4">
+      <h3 className="text-3xl font-black tracking-tight">{title}</h3>
+      <p className="text-lg text-[#110935]/50 font-medium leading-snug">{desc}</p>
+    </div>
+  </div>
+);
 
 export default Landing;

@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Node, Edge } from '@xyflow/react';
-import { showSuccess, showError } from '@/utils/toast';
+import { showError } from '@/utils/toast';
 
 export function useMindMapPersistence(mapId?: string) {
   const [isSaving, setIsSaving] = useState(false);
@@ -48,7 +48,7 @@ export function useMindMapPersistence(mapId?: string) {
         .eq('id', mapId);
 
       if (error) throw error;
-      showSuccess("Alterações salvas!");
+      // Toast removido para evitar excesso de notificações
     } catch (error) {
       showError("Erro ao salvar alterações.");
     } finally {

@@ -183,20 +183,11 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
           <button className="p-3 hover:bg-gray-100 rounded-2xl text-gray-500 transition-all relative">
             <Share2 size={20} />
           </button>
-          
-          <button 
-            onClick={createNewMap}
-            disabled={isCreating}
-            className="bg-blue-600 text-white px-6 py-3 rounded-2xl text-sm font-bold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-100 disabled:opacity-50"
-          >
-            {isCreating ? <Loader2 className="animate-spin" size={18} /> : <Plus size={18} />}
-            Criar novo
-          </button>
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto p-8">
-        {/* Workspaces Section (Replacing Templates) */}
+        {/* Workspaces Section */}
         {!workspaceId && (
           <section className="mb-12">
             <div className="flex items-center justify-between mb-6">
@@ -216,7 +207,6 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
                   label={ws.name}
                   color={ws.color}
                   onClick={() => {
-                    // Dispara evento customizado para a sidebar/index capturar
                     window.dispatchEvent(new CustomEvent('select-workspace', { detail: ws.id }));
                   }}
                 />
@@ -236,19 +226,31 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
                 <FilterButton label="Última abertura" />
               </div>
             </div>
-            <div className="flex items-center bg-gray-100 p-1 rounded-xl">
+            
+            <div className="flex items-center gap-3">
               <button 
-                onClick={() => setViewMode('grid')}
-                className={cn("p-2 rounded-lg transition-all", viewMode === 'grid' ? "bg-white shadow-sm text-blue-600" : "text-gray-400 hover:text-gray-600")}
+                onClick={createNewMap}
+                disabled={isCreating}
+                className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-md shadow-blue-100 disabled:opacity-50"
               >
-                <LayoutGrid size={18} />
+                {isCreating ? <Loader2 className="animate-spin" size={14} /> : <Plus size={14} />}
+                Criar novo
               </button>
-              <button 
-                onClick={() => setViewMode('list')}
-                className={cn("p-2 rounded-lg transition-all", viewMode === 'list' ? "bg-white shadow-sm text-blue-600" : "text-gray-400 hover:text-gray-600")}
-              >
-                <List size={18} />
-              </button>
+
+              <div className="flex items-center bg-gray-100 p-1 rounded-xl">
+                <button 
+                  onClick={() => setViewMode('grid')}
+                  className={cn("p-2 rounded-lg transition-all", viewMode === 'grid' ? "bg-white shadow-sm text-blue-600" : "text-gray-400 hover:text-gray-600")}
+                >
+                  <LayoutGrid size={18} />
+                </button>
+                <button 
+                  onClick={() => setViewMode('list')}
+                  className={cn("p-2 rounded-lg transition-all", viewMode === 'list' ? "bg-white shadow-sm text-blue-600" : "text-gray-400 hover:text-gray-600")}
+                >
+                  <List size={18} />
+                </button>
+              </div>
             </div>
           </div>
 

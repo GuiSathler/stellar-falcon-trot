@@ -159,15 +159,6 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
 
   return (
     <div className="flex flex-col h-full bg-white">
-      {/* Top Banner (Upgrade) */}
-      <div className="bg-blue-600 text-white px-6 py-2.5 flex items-center justify-between text-xs font-bold">
-        <div className="flex items-center gap-2">
-          <Sparkles size={14} />
-          <span>Você atingiu o limite de 3 mapas editáveis. Desbloqueie mapas ilimitados agora.</span>
-        </div>
-        <button className="underline hover:text-blue-100 transition-colors">Fazer upgrade</button>
-      </div>
-
       {/* Dashboard Header */}
       <header className="px-8 py-6 border-b border-gray-100 flex items-center justify-between">
         <h1 className="text-2xl font-black text-gray-900 tracking-tight">
@@ -205,22 +196,31 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
       </header>
 
       <div className="flex-1 overflow-y-auto p-8">
-        {/* Templates Section */}
+        {/* Workspaces Section (Replacing Templates) */}
         {!workspaceId && (
           <section className="mb-12">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest">Templates para começar</h2>
-              <button className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1">
-                Ver todos <ChevronRight size={14} />
-              </button>
+              <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest">Crie um Workspace para começar</h2>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              <TemplateCard icon={Plus} label="Mapa em branco" onClick={createNewMap} isPrimary />
-              <TemplateCard icon={Layers} label="Fluxograma" />
-              <TemplateCard icon={FileText} label="Brainstorming" />
-              <TemplateCard icon={Sparkles} label="IA Playground" />
-              <TemplateCard icon={ArrowRight} label="Roadmap" />
-              <TemplateCard icon={LayoutGrid} label="Miroverse" />
+              <TemplateCard 
+                icon={Plus} 
+                label="Novo Workspace" 
+                onClick={() => setIsModalOpen(true)} 
+                isPrimary 
+              />
+              {workspaces.map((ws) => (
+                <TemplateCard 
+                  key={ws.id}
+                  icon={Layers} 
+                  label={ws.name}
+                  color={ws.color}
+                  onClick={() => {
+                    // Dispara evento customizado para a sidebar/index capturar
+                    window.dispatchEvent(new CustomEvent('select-workspace', { detail: ws.id }));
+                  }}
+                />
+              ))}
             </div>
           </section>
         )}
@@ -229,7 +229,7 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
         <section>
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-6">
-              <h2 className="text-xl font-black text-gray-900">Mapas neste time</h2>
+              <h2 className="text-xl font-black text-gray-900">Mapas Recentes</h2>
               <div className="flex items-center gap-2">
                 <FilterButton label="Todos os mapas" />
                 <FilterButton label="Qualquer título" />
@@ -369,7 +369,7 @@ const Dashboard = ({ onSelectMap, workspaceId }: DashboardProps) => {
   );
 };
 
-const TemplateCard = ({ icon: Icon, label, onClick, isPrimary }: any) => (
+const TemplateCard = ({ icon: Icon, label, onClick, isPrimary, color }: any) => (
   <button 
     onClick={onClick}
     className={cn(
@@ -383,9 +383,13 @@ const TemplateCard = ({ icon: Icon, label, onClick, isPrimary }: any) => (
       "w-12 h-12 rounded-2xl flex items-center justify-center transition-colors",
       isPrimary ? "bg-gray-100 group-hover:bg-blue-100 text-gray-400 group-hover:text-blue-600" : "bg-white text-gray-400 group-hover:text-blue-600 shadow-sm"
     )}>
-      <Icon size={24} />
+      {color ? (
+        <div className="w-4 h-4 rounded-full" style={{ backgroundColor: color }} />
+      ) : (
+        <Icon size={24} />
+      )}
     </div>
-    <span className="text-[11px] font-bold text-gray-600 group-hover:text-gray-900">{label}</span>
+    <span className="text-[11px] font-bold text-gray-600 group-hover:text-gray-900 truncate w-full px-2">{label}</span>
   </button>
 );
 

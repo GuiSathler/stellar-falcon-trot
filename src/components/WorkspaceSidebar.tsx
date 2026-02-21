@@ -107,8 +107,6 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
     navigate('/auth');
   };
 
-  const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId);
-
   return (
     <>
       <div className={cn(
@@ -127,13 +125,10 @@ const WorkspaceSidebar = ({ activeView, setActiveView, activeWorkspaceId, setAct
               <span className="text-white font-black text-xs">BF</span>
             </div>
             {!isCollapsed && (
-              <>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-black text-gray-900 truncate uppercase tracking-tight">Boltz Flow</p>
-                  <p className="text-[10px] font-bold text-gray-400 truncate">Free Plan</p>
-                </div>
-                <ChevronDown size={14} className="text-gray-400" />
-              </>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-black text-gray-900 truncate uppercase tracking-tight">Boltz Flow</p>
+                <p className="text-[10px] font-bold text-gray-400 truncate">Workspace Pessoal</p>
+              </div>
             )}
           </button>
         </div>

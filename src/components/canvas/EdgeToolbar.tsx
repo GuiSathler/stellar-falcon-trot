@@ -9,8 +9,9 @@ import {
   Plus,
   Spline,
   Activity,
-  RotateCcw,
-  Trash2
+  Trash2,
+  Maximize2,
+  MoveHorizontal
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -31,7 +32,6 @@ const COLORS = [
 export const EdgeToolbar = ({ edge, onUpdate, onDelete }: EdgeToolbarProps) => {
   const currentStroke = (edge.style?.stroke as string) || '#94a3b8';
   
-  // Curvatura depende do tipo de linha
   const currentCurvature = edge.type === 'smoothstep' 
     ? (edge.pathOptions?.borderRadius || 20) 
     : (edge.pathOptions?.curvature || 20);
@@ -49,8 +49,8 @@ export const EdgeToolbar = ({ edge, onUpdate, onDelete }: EdgeToolbarProps) => {
     });
   };
 
-  const changeCurvature = (delta: number) => {
-    const newValue = Math.max(0, currentCurvature + delta);
+  const handleCurvatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = parseInt(e.target.value);
     onUpdate(edge.id, {
       pathOptions: edge.type === 'smoothstep' 
         ? { borderRadius: newValue } 
@@ -63,120 +63,118 @@ export const EdgeToolbar = ({ edge, onUpdate, onDelete }: EdgeToolbarProps) => {
     if (newLabel !== null) {
       onUpdate(edge.id, { 
         label: newLabel,
-        // Estilização da "caixa" de texto no meio da linha
-        labelStyle: { 
-          fill: '#1e293b', 
-          fontWeight: 700, 
-          fontSize: 12 
-        },
-        labelBgStyle: { 
-          fill: '#ffffff', 
-          fillOpacity: 1 
-        },
-        labelBgPadding: [8, 4],
-        labelBgBorderRadius: 8,
+        labelStyle: { fill: '#1e293b', fontWeight: 800, fontSize: 12 },
+        labelBgStyle: { fill: '#ffffff', fillOpacity: 1 },
+        labelBgPadding: [10, 6],
+        labelBgBorderRadius: 12,
       });
     }
   };
 
   return (
-    <div className="flex items-center bg-white border border-gray-100 shadow-2xl rounded-2xl p-1.5 gap-1 animate-in fade-in zoom-in duration-200 pointer-events-auto">
+    <div className="flex items-center bg-white border border-gray-100 shadow-[0_20px_50px_rgba(0,0,0,0.1)] rounded-[24px] p-2 gap-2 animate-in fade-in zoom-in duration-300 pointer-events-auto">
       {/* Tipo de Ponta */}
       <button 
         onClick={toggleMarker}
         className={cn(
-          "flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-xl transition-all text-xs font-bold",
-          edge.markerEnd ? "text-blue-600" : "text-gray-500"
+          "flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 rounded-2xl transition-all text-xs font-black uppercase tracking-wider",
+          edge.markerEnd ? "text-blue-600 bg-blue-50" : "text-gray-500"
         )}
       >
-        <span>{edge.markerEnd ? "Seta" : "Nenhum"}</span>
-        <ArrowRight size={14} />
+        <ArrowRight size={16} />
+        <span>{edge.markerEnd ? "Com Seta" : "Sem Seta"}</span>
       </button>
 
-      <div className="w-px h-6 bg-gray-100 mx-1" />
+      <div className="w-px h-8 bg-gray-100 mx-1" />
 
       {/* Tipo de Linha */}
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center gap-1">
         <button 
-          onClick={() => onUpdate(edge.id, { type: 'smoothstep' })}
-          className={cn("p-2 rounded-xl transition-all", edge.type === 'smoothstep' ? "bg-blue-50 text-blue-600" : "text-gray-400 hover:bg-gray-50")}
-          title="Curva Suave"
+          onClick={() => onUpdate(edge.id, { type: 'default' })}
+          className={cn("p-3 rounded-2xl transition-all", edge.type === 'default' || !edge.type ? "bg-blue-600 text-white shadow-lg shadow-blue-100" : "text-gray-400 hover:bg-gray-50")}
+          title="Curva Bézier (Photoshop)"
         >
-          <Spline size={16} />
+          <Spline size={18} />
         </button>
         <button 
           onClick={() => onUpdate(edge.id, { type: 'straight' })}
-          className={cn("p-2 rounded-xl transition-all", edge.type === 'straight' ? "bg-blue-50 text-blue-600" : "text-gray-400 hover:bg-gray-50")}
+          className={cn("p-3 rounded-2xl transition-all", edge.type === 'straight' ? "bg-blue-600 text-white shadow-lg shadow-blue-100" : "text-gray-400 hover:bg-gray-50")}
           title="Linha Reta"
         >
-          <Minus size={16} />
+          <Minus size={18} />
         </button>
         <button 
-          onClick={() => onUpdate(edge.id, { type: 'step' })}
-          className={cn("p-2 rounded-xl transition-all", edge.type === 'step' ? "bg-blue-50 text-blue-600" : "text-gray-400 hover:bg-gray-50")}
-          title="Degrau"
+          onClick={() => onUpdate(edge.id, { type: 'smoothstep' })}
+          className={cn("p-3 rounded-2xl transition-all", edge.type === 'smoothstep' ? "bg-blue-600 text-white shadow-lg shadow-blue-100" : "text-gray-400 hover:bg-gray-50")}
+          title="Degrau Suave"
         >
-          <Activity size={16} />
+          <Activity size={18} />
         </button>
       </div>
 
-      <div className="w-px h-6 bg-gray-100 mx-1" />
+      <div className="w-px h-8 bg-gray-100 mx-1" />
 
-      {/* Controle de Curvatura */}
-      <div className="flex items-center gap-1 px-1">
-        <span className="text-[10px] font-black text-gray-400 uppercase mr-1">Curva</span>
-        <button onClick={() => changeCurvature(-5)} className="p-1.5 hover:bg-gray-50 rounded-lg text-gray-500"><Minus size={14} /></button>
-        <div className="bg-gray-50 px-2 py-1 rounded-lg border border-gray-100 min-w-[30px] text-center">
-          <span className="text-[10px] font-black text-gray-700">{currentCurvature}</span>
+      {/* Controle de Curvatura de Precisão */}
+      <div className="flex flex-col gap-1 px-3 min-w-[120px]">
+        <div className="flex items-center justify-between">
+          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Ângulo de Curva</span>
+          <span className="text-[9px] font-black text-blue-600">{currentCurvature}px</span>
         </div>
-        <button onClick={() => changeCurvature(5)} className="p-1.5 hover:bg-gray-50 rounded-lg text-gray-500"><Plus size={14} /></button>
+        <input 
+          type="range" 
+          min="0" 
+          max="100" 
+          value={currentCurvature}
+          onChange={handleCurvatureChange}
+          className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+        />
       </div>
 
-      <div className="w-px h-6 bg-gray-100 mx-1" />
+      <div className="w-px h-8 bg-gray-100 mx-1" />
 
-      {/* Cor */}
-      <div className="flex items-center gap-1 px-1">
+      {/* Cores */}
+      <div className="flex items-center gap-1.5 px-1">
         {COLORS.map(c => (
           <button
             key={c.value}
             onClick={() => {
-              updateStyle({ stroke: c.value });
+              updateStyle({ stroke: c.value, strokeWidth: 3 });
               if (edge.markerEnd) {
                 onUpdate(edge.id, { markerEnd: { ...edge.markerEnd as any, color: c.value } });
               }
             }}
             className={cn(
-              "w-5 h-5 rounded-full border-2 transition-all hover:scale-110",
-              currentStroke === c.value ? "border-blue-200 scale-110 shadow-sm" : "border-transparent"
+              "w-6 h-6 rounded-full border-2 transition-all hover:scale-125",
+              currentStroke === c.value ? "border-blue-400 scale-110 shadow-md" : "border-transparent"
             )}
             style={{ backgroundColor: c.value }}
           />
         ))}
       </div>
 
-      <div className="w-px h-6 bg-gray-100 mx-1" />
+      <div className="w-px h-8 bg-gray-100 mx-1" />
 
-      {/* Texto (Label) */}
+      {/* Texto */}
       <button 
         onClick={handleSetLabel}
         className={cn(
-          "p-2 rounded-xl transition-all flex items-center gap-2",
+          "p-3 rounded-2xl transition-all flex items-center gap-2",
           edge.label ? "bg-blue-50 text-blue-600" : "text-gray-400 hover:bg-gray-50"
         )}
       >
-        <Type size={16} />
-        {edge.label && <span className="text-[10px] font-bold">Editar</span>}
+        <Type size={18} />
+        {edge.label && <span className="text-[10px] font-black uppercase">Editar</span>}
       </button>
 
-      <div className="w-px h-6 bg-gray-100 mx-1" />
+      <div className="w-px h-8 bg-gray-100 mx-1" />
 
       {/* Excluir */}
       <button 
         onClick={() => onDelete(edge.id)}
-        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+        className="p-3 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"
         title="Excluir Conexão"
       >
-        <Trash2 size={16} />
+        <Trash2 size={18} />
       </button>
     </div>
   );

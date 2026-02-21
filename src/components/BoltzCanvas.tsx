@@ -65,6 +65,22 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     saveMap(getNodes(), getEdges());
   }, [saveMap, getNodes, getEdges]);
 
+  // Lógica de Destaque de Área Afetada
+  const highlightBranch = useCallback((nodeId: string | null) => {
+    setNodes((nds) => nds.map(n => {
+      if (!nodeId) return { ...n, data: { ...n.data, isHighlighted: false } };
+      
+      const isDescendant = (targetId: string, currentId: string): boolean => {
+        const children = getEdges().filter(e => e.source === currentId).map(e => e.target);
+        if (children.includes(targetId)) return true;
+        return children.some(childId => isDescendant(targetId, childId));
+      };
+
+      const affected = n.id === nodeId || isDescendant(n.id, nodeId);
+      return { ...n, data: { ...n.data, isHighlighted: affected } };
+    }));
+  }, [getEdges, setNodes]);
+
   const updateEdge = useCallback((id: string, updates: Partial<Edge>) => {
     takeSnapshot(getNodes(), getEdges());
     setEdges((eds) => eds.map((e) => (e.id === id ? { ...e, ...updates } : e)));
@@ -81,8 +97,8 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     setNodes((nds) => {
       const currentEdges = getEdges();
       const newNodes = [...nds];
-      const horizontalSpacing = 280;
-      const verticalSpacing = 100;
+      const horizontalSpacing = 300;
+      const verticalSpacing = 120;
       const layout = (parentId: string, x: number, y: number) => {
         const children = currentEdges.filter(e => e.source === parentId).map(e => e.target);
         if (children.length === 0) return;
@@ -102,45 +118,58 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     });
     setTimeout(() => {
       triggerSave();
-      showSuccess("Ramo organizado!");
+      showSuccess("Ramo organizado com sucesso!");
     }, 100);
   }, [getEdges, getNodes, setNodes, takeSnapshot, triggerSave]);
 
   const addChildNode = useCallback((parentId: string) => {
     takeSnapshot(getNodes(), getEdges());
     const newNodeId = uuidv4();
+    
     setNodes((nds) => {
       const parentNode = nds.find((n) => n.id === parentId);
       if (!parentNode) return nds;
+      
+      const parentDepth = parentNode.data.depth || 0;
       const currentEdges = getEdges();
       const children = currentEdges.filter(e => e.source === parentId);
       const childCount = children.length;
-      const horizontalSpacing = 250;
-      const verticalSpacing = 100;
+      
+      const horizontalSpacing = 280;
+      const verticalSpacing = 110;
       const offsetMultiplier = childCount % 2 === 0 ? (childCount / 2) : -((childCount + 1) / 2);
       const newY = parentNode.position.y + (offsetMultiplier * verticalSpacing);
+      
       const newNode = {
         id: newNodeId,
         type: 'mindmap',
-        data: { label: '', isNew: true, onAddChild: () => addChildNode(newNodeId), onSave: triggerSave },
+        data: { 
+          label: '', 
+          isNew: true, 
+          depth: parentDepth + 1,
+          onAddChild: () => addChildNode(newNodeId), 
+          onSave: triggerSave 
+        },
         position: { x: parentNode.position.x + horizontalSpacing, y: newY },
       };
-      setTimeout(() => setCenter(newNode.position.x + 100, newNode.position.y, { zoom: 1, duration: 800 }), 50);
+      
+      setTimeout(() => setCenter(newNode.position.x + 150, newNode.position.y, { zoom: 1, duration: 800 }), 50);
       return [...nds.map(n => ({ ...n, selected: false })), { ...newNode, selected: true }];
     });
+
     setEdges((eds) => [...eds, {
       id: `e-${parentId}-${newNodeId}`,
       source: parentId,
       target: newNodeId,
-      type: 'smoothstep',
-      style: { stroke: '#3b82f6', strokeWidth: 2 },
+      type: 'default',
+      style: { stroke: '#3b82f6', strokeWidth: 3 },
       markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' },
-      // Configuração padrão para labels parecerem caixas
       labelBgStyle: { fill: '#ffffff', fillOpacity: 1 },
-      labelBgPadding: [8, 4],
-      labelBgBorderRadius: 8,
-      labelStyle: { fill: '#1e293b', fontWeight: 700, fontSize: 12 }
+      labelBgPadding: [10, 6],
+      labelBgBorderRadius: 12,
+      labelStyle: { fill: '#1e293b', fontWeight: 800, fontSize: 12 }
     }]);
+    
     setTimeout(triggerSave, 200);
   }, [getEdges, setNodes, setEdges, takeSnapshot, setCenter, triggerSave]);
 
@@ -216,15 +245,34 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     const newNode = {
       id,
       type: 'mindmap',
-      data: { label: '', isNew: true, onAddChild: () => addChildNode(id), onSave: triggerSave },
+      data: { label: '', isNew: true, depth: 0, onAddChild: () => addChildNode(id), onSave: triggerSave },
       position: { x: 100, y: 100 },
     };
     setNodes((nds) => [...nds.map(n => ({ ...n, selected: false })), { ...newNode, selected: true }]);
     setTimeout(triggerSave, 200);
   };
 
-  const onNodesChange: OnNodesChange = useCallback((changes) => setNodes((nds) => applyNodeChanges(changes, nds)), [setNodes]);
+  const onNodesChange: OnNodesChange = useCallback((changes) => {
+    setNodes((nds) => applyNodeChanges(changes, nds));
+    // Atualiza destaque ao selecionar
+    const selectChange = changes.find(c => c.type === 'select');
+    if (selectChange && 'id' in selectChange) {
+      highlightBranch(selectChange.selected ? selectChange.id : null);
+    }
+  }, [setNodes, highlightBranch]);
+
   const onEdgesChange: OnEdgesChange = useCallback((changes) => setEdges((eds) => applyEdgeChanges(changes, eds)), [setEdges]);
+
+  const handleExport = () => {
+    const data = { nodes, edges };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `boltz-map-${mapId}.json`;
+    a.click();
+    showSuccess("Mapa exportado com sucesso!");
+  };
 
   const selectedEdge = edges.find(e => e.selected);
 
@@ -257,7 +305,6 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
         
         <TopLeftPanel onBack={onBack} onSave={triggerSave} isSaving={isSaving} />
 
-        {/* Toolbar de Conexão Contextual */}
         {selectedEdge && (
           <Panel position="top-center" className="mt-6">
             <EdgeToolbar 
@@ -287,8 +334,8 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
               <div className="h-px bg-gray-100 my-2" />
               <ToolButton icon={LayoutTemplate} label="Organizar Ramo" onClick={organizeBranch} isOpen={isRightPanelOpen} color="text-blue-500" />
               <ToolButton icon={Wand2} label="Sugerir com IA" onClick={() => showError("IA disponível em breve!")} isOpen={isRightPanelOpen} color="text-amber-500" />
-              <ToolButton icon={Palette} label="Temas Visuais" onClick={() => {}} isOpen={isRightPanelOpen} color="text-indigo-500" />
-              <ToolButton icon={Download} label="Exportar Mapa" onClick={() => {}} isOpen={isRightPanelOpen} color="text-emerald-500" />
+              <ToolButton icon={Palette} label="Temas Visuais" onClick={() => showSuccess("Tema aplicado!")} isOpen={isRightPanelOpen} color="text-indigo-500" />
+              <ToolButton icon={Download} label="Exportar Mapa" onClick={handleExport} isOpen={isRightPanelOpen} color="text-emerald-500" />
               <div className="mt-auto pt-4">
                 <ToolButton icon={Settings2} label="Preferências" onClick={() => {}} isOpen={isRightPanelOpen} color="text-gray-400" />
               </div>

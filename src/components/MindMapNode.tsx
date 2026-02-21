@@ -17,11 +17,11 @@ import {
   MoreHorizontal 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Switch } from "@/components/ui/switch";
 
 export type MindMapNodeData = {
   label: string;
   onAddChild?: () => void;
+  onSave?: () => void;
   isNew?: boolean;
   style?: {
     backgroundColor?: string;
@@ -37,12 +37,11 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
   const [label, setLabel] = useState(data.label);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Foco e seleção automática ao entrar em modo de edição
   useEffect(() => {
     if (isEditing && textareaRef.current) {
       const timer = setTimeout(() => {
         textareaRef.current?.focus();
-        textareaRef.current?.select(); // Seleciona tudo para sobrescrever rápido
+        textareaRef.current?.select();
       }, 50);
       return () => clearTimeout(timer);
     }
@@ -50,7 +49,9 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
 
   const handleBlur = () => {
     setIsEditing(false);
-    if (!label.trim() && data.isNew) {
+    const trimmedLabel = label.trim();
+    
+    if (!trimmedLabel && data.isNew) {
       setNodes((nds) => nds.filter((n) => n.id !== id));
       return;
     }
@@ -60,17 +61,21 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
         if (node.id === id) {
           return { 
             ...node, 
-            data: { ...node.data, label: label.trim(), isNew: false } 
+            data: { ...node.data, label: trimmedLabel, isNew: false } 
           };
         }
         return node;
       })
     );
+
+    // Gatilho de salvamento após edição concluída
+    if (data.onSave) {
+      setTimeout(data.onSave, 100);
+    }
   };
 
   return (
     <div className="relative group">
-      {/* Floating Toolbar */}
       {selected && (
         <div className="absolute -top-16 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-gray-100 px-3 py-2 rounded-xl shadow-2xl z-[1000] animate-in fade-in slide-in-from-bottom-2 duration-200 whitespace-nowrap">
           <div className="flex items-center gap-3 pr-3 border-r border-gray-100">
@@ -92,7 +97,6 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
         </div>
       )}
 
-      {/* Node Body */}
       <div 
         className={cn(
           "relative transition-all duration-200 min-w-[220px] max-w-[400px]",
@@ -128,7 +132,6 @@ const MindMapNode = ({ id, data, selected }: NodeProps<Node<MindMapNodeData>>) =
           )}
         </div>
 
-        {/* Add Button (Right Side) */}
         <button 
           onClick={(e) => {
             e.stopPropagation();

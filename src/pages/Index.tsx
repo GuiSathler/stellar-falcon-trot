@@ -8,11 +8,10 @@ import ReleaseNotes from '@/components/ReleaseNotes';
 import Settings from '@/pages/Settings';
 
 const Index = () => {
-  const [activeView, setActiveView] = useState('dashboard'); // dashboard, editor, updates, settings
+  const [activeView, setActiveView] = useState('dashboard'); // dashboard, recent, favorites, updates, settings, editor
   const [selectedMapId, setSelectedMapId] = useState<string | undefined>(undefined);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | undefined>(undefined);
 
-  // Escutar eventos de seleção de workspace vindos do Dashboard
   useEffect(() => {
     const handleWsSelect = (e: any) => {
       setActiveWorkspaceId(e.detail);
@@ -31,6 +30,10 @@ const Index = () => {
     switch (activeView) {
       case 'dashboard':
         return <Dashboard onSelectMap={handleSelectMap} workspaceId={activeWorkspaceId} />;
+      case 'recent':
+        return <Dashboard onSelectMap={handleSelectMap} filterType="recent" />;
+      case 'favorites':
+        return <Dashboard onSelectMap={handleSelectMap} filterType="favorites" />;
       case 'updates':
         return <ReleaseNotes />;
       case 'settings':

@@ -51,11 +51,19 @@ interface BoltzCanvasProps {
   onBack?: () => void;
 }
 
+const THEMES = {
+  default: { bg: '#fcfcfc', grid: '#e5e7eb', variant: BackgroundVariant.Dots },
+  dark: { bg: '#1a1a1a', grid: '#333333', variant: BackgroundVariant.Lines },
+  blueprint: { bg: '#1e3a8a', grid: '#3b82f6', variant: BackgroundVariant.Lines },
+  soft: { bg: '#fdf2f8', grid: '#fbcfe8', variant: BackgroundVariant.Dots },
+};
+
 const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
   const [nodes, setNodes] = useNodesState([]);
   const [edges, setEdges] = useEdgesState([]);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
   const [isMiniMapOpen, setIsMiniMapOpen] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState<keyof typeof THEMES>('default');
   
   const { fitView, getEdges, getNodes, setCenter } = useReactFlow();
   const { undo, redo, takeSnapshot, canUndo, canRedo } = useMindMapHistory();
@@ -70,6 +78,24 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     setEdges((eds) => eds.map((e) => (e.id === id ? { ...e, ...updates } : e)));
     setTimeout(triggerSave, 100);
   }, [getNodes, getEdges, setEdges, takeSnapshot, triggerSave]);
+
+  const exportMap = () => {
+    const data = { nodes: getNodes(), edges: getEdges(), exportedAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `boltz-map-${mapId || 'export'}.json`;
+    link.click();
+    showSuccess("Mapa exportado com sucesso!");
+  };
+
+  const cycleTheme = () => {
+    const themes = Object.keys(THEMES) as (keyof typeof THEMES)[];
+    const nextIndex = (themes.indexOf(currentTheme) + 1) % themes.length;
+    setCurrentTheme(themes[nextIndex]);
+    showSuccess(`Tema alterado para: ${themes[nextIndex]}`);
+  };
 
   const organizeBranch = useCallback(() => {
     const selectedNode = getNodes().find(n => n.selected);
@@ -100,10 +126,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       layout(selectedNode.id, selectedNode.position.x, selectedNode.position.y);
       return newNodes;
     });
-    setTimeout(() => {
-      triggerSave();
-      showSuccess("Ramo organizado!");
-    }, 100);
+    setTimeout(() => { triggerSave(); showSuccess("Ramo organizado!"); }, 100);
   }, [getEdges, getNodes, setNodes, takeSnapshot, triggerSave]);
 
   const addChildNode = useCallback((parentId: string) => {
@@ -135,7 +158,6 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       type: 'smoothstep',
       style: { stroke: '#3b82f6', strokeWidth: 2 },
       markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' },
-      // Configuração padrão para labels parecerem caixas
       labelBgStyle: { fill: '#ffffff', fillOpacity: 1 },
       labelBgPadding: [8, 4],
       labelBgBorderRadius: 8,
@@ -194,20 +216,12 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
 
   const handleUndo = () => {
     const prev = undo(getNodes(), getEdges());
-    if (prev) {
-      setNodes(hydrateNodes(prev.nodes));
-      setEdges(prev.edges);
-      setTimeout(triggerSave, 100);
-    }
+    if (prev) { setNodes(hydrateNodes(prev.nodes)); setEdges(prev.edges); setTimeout(triggerSave, 100); }
   };
 
   const handleRedo = () => {
     const next = redo(getNodes(), getEdges());
-    if (next) {
-      setNodes(hydrateNodes(next.nodes));
-      setEdges(next.edges);
-      setTimeout(triggerSave, 100);
-    }
+    if (next) { setNodes(hydrateNodes(next.nodes)); setEdges(next.edges); setTimeout(triggerSave, 100); }
   };
 
   const addRootNode = () => {
@@ -227,16 +241,12 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
   const onEdgesChange: OnEdgesChange = useCallback((changes) => setEdges((eds) => applyEdgeChanges(changes, eds)), [setEdges]);
 
   const selectedEdge = edges.find(e => e.selected);
+  const theme = THEMES[currentTheme];
 
-  if (isLoading) return (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-white gap-4">
-      <Loader2 className="animate-spin text-blue-600" size={48} />
-      <p className="text-gray-500 font-bold">Carregando seu mapa...</p>
-    </div>
-  );
+  if (isLoading) return <div className="w-full h-full flex flex-col items-center justify-center bg-white gap-4"><Loader2 className="animate-spin text-blue-600" size={48} /><p className="text-gray-500 font-bold">Carregando seu mapa...</p></div>;
 
   return (
-    <div className="w-full h-full bg-[#fcfcfc] relative overflow-hidden">
+    <div className="w-full h-full relative overflow-hidden" style={{ backgroundColor: theme.bg }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -253,45 +263,30 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
         maxZoom={2}
         fitView
       >
-        <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="#e5e7eb" />
+        <Background variant={theme.variant} gap={24} size={1} color={theme.grid} />
         
         <TopLeftPanel onBack={onBack} onSave={triggerSave} isSaving={isSaving} />
 
-        {/* Toolbar de Conexão Contextual */}
         {selectedEdge && (
           <Panel position="top-center" className="mt-6">
-            <EdgeToolbar 
-              edge={selectedEdge} 
-              onUpdate={updateEdge} 
-              onDelete={(id) => setEdges(eds => eds.filter(e => e.id !== id))} 
-            />
+            <EdgeToolbar edge={selectedEdge} onUpdate={updateEdge} onDelete={(id) => setEdges(eds => eds.filter(e => e.id !== id))} />
           </Panel>
         )}
 
         <Panel position="top-right" className="h-[calc(100%-3rem)] flex items-center pointer-events-none m-6">
-          <div className={cn(
-            "bg-white border border-gray-100 shadow-2xl rounded-[32px] transition-all duration-500 pointer-events-auto flex flex-col overflow-hidden",
-            isRightPanelOpen ? "w-64 p-6" : "w-14 p-2"
-          )}>
+          <div className={cn("bg-white border border-gray-100 shadow-2xl rounded-[32px] transition-all duration-500 pointer-events-auto flex flex-col overflow-hidden", isRightPanelOpen ? "w-64 p-6" : "w-14 p-2")}>
             <div className="flex items-center justify-between mb-8">
               {isRightPanelOpen && <span className="text-xs font-black uppercase tracking-widest text-gray-400">Ferramentas</span>}
-              <button onClick={() => setIsRightPanelOpen(!isRightPanelOpen)} className="p-2 hover:bg-gray-50 rounded-xl text-gray-400 transition-colors">
-                {isRightPanelOpen ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-              </button>
+              <button onClick={() => setIsRightPanelOpen(!isRightPanelOpen)} className="p-2 hover:bg-gray-50 rounded-xl text-gray-400 transition-colors">{isRightPanelOpen ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}</button>
             </div>
             <div className="flex flex-col gap-4">
-              <button onClick={addRootNode} className={cn("flex items-center gap-3 p-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all active:scale-95", !isRightPanelOpen && "justify-center")}>
-                <PlusCircle size={20} />
-                {isRightPanelOpen && <span className="text-sm font-bold">Novo Tópico</span>}
-              </button>
+              <button onClick={addRootNode} className={cn("flex items-center gap-3 p-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all active:scale-95", !isRightPanelOpen && "justify-center")}><PlusCircle size={20} />{isRightPanelOpen && <span className="text-sm font-bold">Novo Tópico</span>}</button>
               <div className="h-px bg-gray-100 my-2" />
               <ToolButton icon={LayoutTemplate} label="Organizar Ramo" onClick={organizeBranch} isOpen={isRightPanelOpen} color="text-blue-500" />
               <ToolButton icon={Wand2} label="Sugerir com IA" onClick={() => showError("IA disponível em breve!")} isOpen={isRightPanelOpen} color="text-amber-500" />
-              <ToolButton icon={Palette} label="Temas Visuais" onClick={() => {}} isOpen={isRightPanelOpen} color="text-indigo-500" />
-              <ToolButton icon={Download} label="Exportar Mapa" onClick={() => {}} isOpen={isRightPanelOpen} color="text-emerald-500" />
-              <div className="mt-auto pt-4">
-                <ToolButton icon={Settings2} label="Preferências" onClick={() => {}} isOpen={isRightPanelOpen} color="text-gray-400" />
-              </div>
+              <ToolButton icon={Palette} label="Temas Visuais" onClick={cycleTheme} isOpen={isRightPanelOpen} color="text-indigo-500" />
+              <ToolButton icon={Download} label="Exportar Mapa" onClick={exportMap} isOpen={isRightPanelOpen} color="text-emerald-500" />
+              <div className="mt-auto pt-4"><ToolButton icon={Settings2} label="Preferências" onClick={() => {}} isOpen={isRightPanelOpen} color="text-gray-400" /></div>
             </div>
           </div>
         </Panel>
@@ -299,14 +294,8 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
         <BottomLeftPanel onUndo={handleUndo} onRedo={handleRedo} canUndo={canUndo} canRedo={canRedo} />
 
         <Panel position="bottom-right" className="m-6 flex flex-col items-end gap-3">
-          {isMiniMapOpen && (
-            <div className="bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-200">
-              <MiniMap style={{ width: 200, height: 140 }} maskColor="rgba(243, 244, 246, 0.6)" nodeColor="#3b82f6" />
-            </div>
-          )}
-          <button onClick={() => setIsMiniMapOpen(!isMiniMapOpen)} className={cn("w-12 h-12 bg-white border border-gray-100 rounded-2xl shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95", isMiniMapOpen ? "text-blue-600 border-blue-100" : "text-gray-400 hover:text-blue-600")}>
-            <MapIcon size={20} />
-          </button>
+          {isMiniMapOpen && <div className="bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-200"><MiniMap style={{ width: 200, height: 140 }} maskColor="rgba(243, 244, 246, 0.6)" nodeColor="#3b82f6" /></div>}
+          <button onClick={() => setIsMiniMapOpen(!isMiniMapOpen)} className={cn("w-12 h-12 bg-white border border-gray-100 rounded-2xl shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95", isMiniMapOpen ? "text-blue-600 border-blue-100" : "text-gray-400 hover:text-blue-600")}><MapIcon size={20} /></button>
         </Panel>
       </ReactFlow>
     </div>

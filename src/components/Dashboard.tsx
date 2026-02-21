@@ -18,6 +18,7 @@ import {
   ChevronDown,
   Star,
   MoreHorizontal,
+  Sparkles,
   User as UserIcon
 } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';

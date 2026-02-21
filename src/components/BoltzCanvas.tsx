@@ -23,7 +23,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import MindMapNode, { MindMapNodeData } from './MindMapNode';
 import { v4 as uuidv4 } from 'uuid';
-import { showSuccess } from '@/utils/toast';
+import { showSuccess, showError } from '@/utils/toast';
 import { 
   PlusCircle, 
   Sparkles, 
@@ -32,6 +32,10 @@ import {
   Map as MapIcon,
   Loader2,
   LayoutTemplate,
+  Palette,
+  Wand2,
+  Download,
+  Settings2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMindMapHistory } from '@/hooks/useMindMapHistory';
@@ -49,19 +53,20 @@ interface BoltzCanvasProps {
 const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
   const [nodes, setNodes] = useNodesState([]);
   const [edges, setEdges] = useEdgesState([]);
-  const [isMenuOpen, setIsMenuOpen] = useState(true);
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
   const [isMiniMapOpen, setIsMiniMapOpen] = useState(false);
   
   const { fitView, getEdges, getNodes, setCenter } = useReactFlow();
   const { undo, redo, takeSnapshot, canUndo, canRedo } = useMindMapHistory();
   const { loadMap, saveMap, isLoading, isSaving } = useMindMapPersistence(mapId);
 
-  // Função centralizada para disparar o salvamento manual/baseado em evento
   const triggerSave = useCallback(() => {
     saveMap(getNodes(), getEdges());
   }, [saveMap, getNodes, getEdges]);
 
   const autoLayout = useCallback(() => {
+    if (!confirm("Isso reorganizará todo o seu mapa. Deseja continuar? Você pode desfazer se não gostar.")) return;
+    
     takeSnapshot(getNodes(), getEdges());
     
     setNodes((nds) => {
@@ -70,8 +75,8 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       if (!root) return nds;
 
       const newNodes = [...nds];
-      const horizontalSpacing = 450;
-      const verticalSpacing = 180;
+      const horizontalSpacing = 300;
+      const verticalSpacing = 120;
 
       const layout = (parentId: string, x: number, y: number) => {
         const children = currentEdges.filter(e => e.source === parentId).map(e => e.target);
@@ -96,8 +101,8 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     setTimeout(() => {
       fitView({ duration: 800 });
       triggerSave();
+      showSuccess("Mapa organizado! Use Ctrl+Z para desfazer.");
     }, 100);
-    showSuccess("Mapa organizado!");
   }, [getEdges, getNodes, setNodes, takeSnapshot, fitView, triggerSave]);
 
   const addChildNode = useCallback((parentId: string) => {
@@ -112,8 +117,8 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       const children = currentEdges.filter(e => e.source === parentId);
       const childCount = children.length;
       
-      const horizontalSpacing = 400;
-      const verticalSpacing = 160;
+      const horizontalSpacing = 250;
+      const verticalSpacing = 100;
       
       const offsetMultiplier = childCount % 2 === 0 ? (childCount / 2) : -((childCount + 1) / 2);
       const newY = parentNode.position.y + (offsetMultiplier * verticalSpacing);
@@ -143,13 +148,12 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
         source: parentId,
         target: newNodeId,
         type: 'smoothstep',
-        style: { stroke: '#3b82f6', strokeWidth: 2.5 },
+        style: { stroke: '#3b82f6', strokeWidth: 2 },
         markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' },
       }];
       return newEdges;
     });
 
-    // Salva após a criação
     setTimeout(triggerSave, 200);
   }, [getEdges, setNodes, setEdges, takeSnapshot, setCenter, triggerSave]);
 
@@ -293,40 +297,90 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
         selectionOnDrag={true}
         selectionMode={SelectionMode.Partial}
         panOnDrag={[1, 2]}
+        minZoom={0.1}
+        maxZoom={2}
         fitView
       >
         <Background 
           variant={BackgroundVariant.Dots} 
           gap={24} 
-          size={1.5} 
+          size={1} 
           color="#e5e7eb" 
         />
         
         <TopLeftPanel onBack={onBack} onSave={triggerSave} isSaving={isSaving} />
 
-        <Panel position="top-right" className="h-[calc(100%-2rem)] flex items-center pointer-events-none">
-          <div className={cn("bg-white border border-gray-100 shadow-2xl rounded-2xl transition-all pointer-events-auto flex flex-col overflow-hidden", isMenuOpen ? "w-52 p-3" : "w-12 p-2")}>
-            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="mb-4 p-1.5 hover:bg-gray-50 rounded-lg self-end">
-              {isMenuOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-            </button>
-            <div className={cn("flex flex-col gap-1.5", !isMenuOpen && "items-center")}>
-              <button onClick={addRootNode} className="flex items-center gap-2.5 p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-md mb-2">
-                <PlusCircle size={18} />
-                {isMenuOpen && <span className="text-xs font-bold">Novo Tópico</span>}
-              </button>
-              
+        {/* Menu Lateral Direito Refatorado */}
+        <Panel position="top-right" className="h-[calc(100%-3rem)] flex items-center pointer-events-none m-6">
+          <div className={cn(
+            "bg-white border border-gray-100 shadow-2xl rounded-[32px] transition-all duration-500 pointer-events-auto flex flex-col overflow-hidden",
+            isRightPanelOpen ? "w-64 p-6" : "w-14 p-2"
+          )}>
+            <div className="flex items-center justify-between mb-8">
+              {isRightPanelOpen && <span className="text-xs font-black uppercase tracking-widest text-gray-400">Ferramentas</span>}
               <button 
-                onClick={autoLayout}
-                className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl"
+                onClick={() => setIsRightPanelOpen(!isRightPanelOpen)} 
+                className="p-2 hover:bg-gray-50 rounded-xl text-gray-400 transition-colors"
               >
-                <LayoutTemplate size={18} className="text-blue-500" />
-                {isMenuOpen && <span className="text-xs font-medium">Auto-Alinhar</span>}
+                {isRightPanelOpen ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <button 
+                onClick={addRootNode} 
+                className={cn(
+                  "flex items-center gap-3 p-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all active:scale-95",
+                  !isRightPanelOpen && "justify-center"
+                )}
+              >
+                <PlusCircle size={20} />
+                {isRightPanelOpen && <span className="text-sm font-bold">Novo Tópico</span>}
               </button>
 
-              <button className="flex items-center gap-2.5 p-2 text-gray-600 hover:bg-gray-50 rounded-xl">
-                <Sparkles size={18} className="text-amber-400" />
-                {isMenuOpen && <span className="text-xs font-medium">Sugerir IA</span>}
-              </button>
+              <div className="h-px bg-gray-100 my-2" />
+
+              <ToolButton 
+                icon={LayoutTemplate} 
+                label="Auto-Alinhar" 
+                onClick={autoLayout} 
+                isOpen={isRightPanelOpen} 
+                color="text-blue-500"
+              />
+              
+              <ToolButton 
+                icon={Wand2} 
+                label="Sugerir com IA" 
+                onClick={() => showError("IA disponível em breve!")} 
+                isOpen={isRightPanelOpen} 
+                color="text-amber-500"
+              />
+
+              <ToolButton 
+                icon={Palette} 
+                label="Temas Visuais" 
+                onClick={() => {}} 
+                isOpen={isRightPanelOpen} 
+                color="text-indigo-500"
+              />
+
+              <ToolButton 
+                icon={Download} 
+                label="Exportar Mapa" 
+                onClick={() => {}} 
+                isOpen={isRightPanelOpen} 
+                color="text-emerald-500"
+              />
+
+              <div className="mt-auto pt-4">
+                <ToolButton 
+                  icon={Settings2} 
+                  label="Preferências" 
+                  onClick={() => {}} 
+                  isOpen={isRightPanelOpen} 
+                  color="text-gray-400"
+                />
+              </div>
             </div>
           </div>
         </Panel>
@@ -357,6 +411,19 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     </div>
   );
 };
+
+const ToolButton = ({ icon: Icon, label, onClick, isOpen, color }: any) => (
+  <button 
+    onClick={onClick}
+    className={cn(
+      "flex items-center gap-3 p-2.5 text-gray-600 hover:bg-gray-50 rounded-2xl transition-all group",
+      !isOpen && "justify-center"
+    )}
+  >
+    <Icon size={20} className={cn("transition-colors", color)} />
+    {isOpen && <span className="text-sm font-bold group-hover:text-gray-900">{label}</span>}
+  </button>
+);
 
 const BoltzCanvas = (props: BoltzCanvasProps) => (
   <ReactFlowProvider>

@@ -38,6 +38,7 @@ import { useMindMapHistory } from '@/hooks/useMindMapHistory';
 import { useMindMapPersistence } from '@/hooks/useMindMapPersistence';
 import { TopLeftPanel } from './canvas/TopLeftPanel';
 import { BottomLeftPanel } from './canvas/BottomLeftPanel';
+import { EditorSidebar } from './canvas/EditorSidebar';
 
 const nodeTypes = { mindmap: MindMapNode };
 
@@ -50,28 +51,32 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
   const [nodes, setNodes] = useNodesState([]);
   const [edges, setEdges] = useEdgesState([]);
   const [isMenuOpen, setIsMenuOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMiniMapOpen, setIsMiniMapOpen] = useState(false);
   
   const { fitView, getEdges, getNodes, setCenter } = useReactFlow();
   const { undo, redo, takeSnapshot, canUndo, canRedo } = useMindMapHistory();
   const { loadMap, saveMap, isLoading, isSaving } = useMindMapPersistence(mapId);
 
-  // Função centralizada para disparar o salvamento manual/baseado em evento
   const triggerSave = useCallback(() => {
     saveMap(getNodes(), getEdges());
   }, [saveMap, getNodes, getEdges]);
 
   const autoLayout = useCallback(() => {
+    const selectedNode = getNodes().find(n => n.selected);
+    
+    // Se houver um nó selecionado, organizamos apenas os filhos dele (Seguro)
+    // Se não houver nada selecionado, organizamos o mapa inteiro
     takeSnapshot(getNodes(), getEdges());
     
     setNodes((nds) => {
       const currentEdges = getEdges();
-      const root = nds.find(n => !currentEdges.some(e => e.target === n.id));
+      const root = selectedNode || nds.find(n => !currentEdges.some(e => e.target === n.id));
       if (!root) return nds;
 
       const newNodes = [...nds];
-      const horizontalSpacing = 450;
-      const verticalSpacing = 180;
+      const horizontalSpacing = 350; // Proporção profissional
+      const verticalSpacing = 120;
 
       const layout = (parentId: string, x: number, y: number) => {
         const children = currentEdges.filter(e => e.source === parentId).map(e => e.target);
@@ -97,7 +102,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       fitView({ duration: 800 });
       triggerSave();
     }, 100);
-    showSuccess("Mapa organizado!");
+    showSuccess(selectedNode ? "Ramo organizado!" : "Mapa organizado!");
   }, [getEdges, getNodes, setNodes, takeSnapshot, fitView, triggerSave]);
 
   const addChildNode = useCallback((parentId: string) => {
@@ -112,8 +117,8 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       const children = currentEdges.filter(e => e.source === parentId);
       const childCount = children.length;
       
-      const horizontalSpacing = 400;
-      const verticalSpacing = 160;
+      const horizontalSpacing = 320;
+      const verticalSpacing = 100;
       
       const offsetMultiplier = childCount % 2 === 0 ? (childCount / 2) : -((childCount + 1) / 2);
       const newY = parentNode.position.y + (offsetMultiplier * verticalSpacing);
@@ -131,7 +136,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       };
 
       setTimeout(() => {
-        setCenter(newNode.position.x + 100, newNode.position.y, { zoom: 1, duration: 800 });
+        setCenter(newNode.position.x + 100, newNode.position.y, { zoom: 1.1, duration: 800 });
       }, 50);
 
       return [...nds.map(n => ({ ...n, selected: false })), { ...newNode, selected: true }];
@@ -143,13 +148,12 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
         source: parentId,
         target: newNodeId,
         type: 'smoothstep',
-        style: { stroke: '#3b82f6', strokeWidth: 2.5 },
-        markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' },
+        style: { stroke: '#93c5fd', strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#93c5fd' },
       }];
       return newEdges;
     });
 
-    // Salva após a criação
     setTimeout(triggerSave, 200);
   }, [getEdges, setNodes, setEdges, takeSnapshot, setCenter, triggerSave]);
 
@@ -220,7 +224,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       if (content) {
         setNodes(hydrateNodes(content.nodes));
         setEdges(content.edges);
-        setTimeout(() => fitView({ duration: 800 }), 100);
+        setTimeout(() => fitView({ duration: 800, padding: 0.2 }), 100);
       }
     });
   }, [loadMap, setNodes, setEdges, fitView, hydrateNodes]);
@@ -293,6 +297,8 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
         selectionOnDrag={true}
         selectionMode={SelectionMode.Partial}
         panOnDrag={[1, 2]}
+        minZoom={0.1}
+        maxZoom={2}
         fitView
       >
         <Background 
@@ -303,6 +309,8 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
         />
         
         <TopLeftPanel onBack={onBack} onSave={triggerSave} isSaving={isSaving} />
+        
+        <EditorSidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
         <Panel position="top-right" className="h-[calc(100%-2rem)] flex items-center pointer-events-none">
           <div className={cn("bg-white border border-gray-100 shadow-2xl rounded-2xl transition-all pointer-events-auto flex flex-col overflow-hidden", isMenuOpen ? "w-52 p-3" : "w-12 p-2")}>

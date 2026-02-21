@@ -18,6 +18,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
   SelectionMode,
+  BackgroundVariant,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import MindMapNode, { MindMapNodeData } from './MindMapNode';
@@ -30,8 +31,6 @@ import {
   ChevronLeft,
   Map as MapIcon,
   Loader2,
-  History,
-  RotateCcw,
   LayoutTemplate,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -39,7 +38,6 @@ import { useMindMapHistory } from '@/hooks/useMindMapHistory';
 import { useMindMapPersistence } from '@/hooks/useMindMapPersistence';
 import { TopLeftPanel } from './canvas/TopLeftPanel';
 import { BottomLeftPanel } from './canvas/BottomLeftPanel';
-import { supabase } from '@/lib/supabase';
 
 const nodeTypes = { mindmap: MindMapNode };
 
@@ -52,9 +50,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
   const [nodes, setNodes] = useNodesState([]);
   const [edges, setEdges] = useEdgesState([]);
   const [isMenuOpen, setIsMenuOpen] = useState(true);
-  const [isMiniMapOpen, setIsMiniMapOpen] = useState(true);
-  const [isVersionsOpen, setIsVersionsOpen] = useState(false);
-  const [versions, setVersions] = useState<any[]>([]);
+  const [isMiniMapOpen, setIsMiniMapOpen] = useState(false); // Começa fechado para não poluir
   
   const { fitView, getEdges, getNodes, setCenter } = useReactFlow();
   const { undo, redo, takeSnapshot, canUndo, canRedo } = useMindMapHistory();
@@ -62,7 +58,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
   
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Salvamento Automático Aprimorado (2 segundos)
+  // Salvamento Automático
   useEffect(() => {
     if (nodes.length === 0 || isLoading) return;
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
@@ -76,7 +72,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
     };
   }, [nodes, edges, saveMap, isLoading]);
 
-  // Função de Auto-Layout (Alinhamento Automático)
+  // Função de Auto-Layout (Organização Inteligente)
   const autoLayout = useCallback(() => {
     takeSnapshot(getNodes(), getEdges());
     
@@ -86,8 +82,8 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       if (!root) return nds;
 
       const newNodes = [...nds];
-      const horizontalSpacing = 400;
-      const verticalSpacing = 160;
+      const horizontalSpacing = 450; // Aumentado para evitar sobreposição de texto longo
+      const verticalSpacing = 180;
 
       const layout = (parentId: string, x: number, y: number) => {
         const children = currentEdges.filter(e => e.source === parentId).map(e => e.target);
@@ -125,11 +121,14 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       const children = currentEdges.filter(e => e.source === parentId);
       const childCount = children.length;
       
-      const horizontalSpacing = 350;
-      const verticalSpacing = 140;
-      const totalHeight = (childCount) * verticalSpacing;
-      const startY = parentNode.position.y - (totalHeight / 2);
-      const newY = startY + (childCount * verticalSpacing);
+      // Lógica de posicionamento em leque para evitar sobreposição
+      const horizontalSpacing = 400;
+      const verticalSpacing = 160;
+      
+      // Calcula o deslocamento vertical baseado no número de filhos existentes
+      // Alterna entre cima e baixo para manter o equilíbrio
+      const offsetMultiplier = childCount % 2 === 0 ? (childCount / 2) : -((childCount + 1) / 2);
+      const newY = parentNode.position.y + (offsetMultiplier * verticalSpacing);
       
       const newNode = {
         id: newNodeId,
@@ -154,7 +153,7 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       source: parentId,
       target: newNodeId,
       type: 'smoothstep',
-      style: { stroke: '#3b82f6', strokeWidth: 2 },
+      style: { stroke: '#3b82f6', strokeWidth: 2.5 },
       markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' },
     }]);
   }, [getEdges, setNodes, setEdges, takeSnapshot, setCenter]);
@@ -290,7 +289,13 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
         panOnDrag={[1, 2]}
         fitView
       >
-        <Background color="#f1f1f1" gap={40} size={1} />
+        {/* Fundo Miro-Style: Grade de pontos sutil */}
+        <Background 
+          variant={BackgroundVariant.Dots} 
+          gap={24} 
+          size={1.5} 
+          color="#e5e7eb" 
+        />
         
         <TopLeftPanel onBack={onBack} onSave={() => saveMap(getNodes(), getEdges())} isSaving={isSaving} />
 
@@ -323,18 +328,22 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
 
         <BottomLeftPanel onUndo={handleUndo} onRedo={handleRedo} canUndo={canUndo} canRedo={canRedo} />
 
-        {/* MiniMap no canto inferior direito para evitar sobreposição com controles */}
+        {/* MiniMap no canto inferior direito com botão de toggle */}
         <Panel position="bottom-right" className="m-6 flex flex-col items-end gap-3">
           {isMiniMapOpen && (
             <div className="bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-200">
-              <MiniMap style={{ width: 180, height: 120 }} />
+              <MiniMap 
+                style={{ width: 200, height: 140 }} 
+                maskColor="rgba(243, 244, 246, 0.6)"
+                nodeColor="#3b82f6"
+              />
             </div>
           )}
           <button 
             onClick={() => setIsMiniMapOpen(!isMiniMapOpen)} 
             className={cn(
-              "w-12 h-12 bg-white border border-gray-100 rounded-2xl shadow-lg flex items-center justify-center transition-all",
-              isMiniMapOpen ? "text-blue-600" : "text-gray-400 hover:text-blue-600"
+              "w-12 h-12 bg-white border border-gray-100 rounded-2xl shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95",
+              isMiniMapOpen ? "text-blue-600 border-blue-100" : "text-gray-400 hover:text-blue-600"
             )}
           >
             <MapIcon size={20} />

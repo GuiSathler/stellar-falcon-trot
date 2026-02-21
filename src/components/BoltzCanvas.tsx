@@ -19,7 +19,6 @@ import {
   applyEdgeChanges,
   SelectionMode,
   BackgroundVariant,
-  EdgeLabelRenderer,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import MindMapNode, { MindMapNodeData } from './MindMapNode';
@@ -136,6 +135,11 @@ const BoltzCanvasInner = ({ mapId, onBack }: BoltzCanvasProps) => {
       type: 'smoothstep',
       style: { stroke: '#3b82f6', strokeWidth: 2 },
       markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' },
+      // Configuração padrão para labels parecerem caixas
+      labelBgStyle: { fill: '#ffffff', fillOpacity: 1 },
+      labelBgPadding: [8, 4],
+      labelBgBorderRadius: 8,
+      labelStyle: { fill: '#1e293b', fontWeight: 700, fontSize: 12 }
     }]);
     setTimeout(triggerSave, 200);
   }, [getEdges, setNodes, setEdges, takeSnapshot, setCenter, triggerSave]);
